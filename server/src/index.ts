@@ -17,6 +17,9 @@ import dashboardRoutes from './routes/dashboard';
 import exportRoutes from './routes/export';
 import committeeRoutes from './routes/committee';
 import userRoutes from './routes/users';
+import settingsRoutes from './routes/settings';
+import { requireAuth, requireAdmin } from './middleware/auth';
+import { getTelegramConfig, maskBotToken, sendTelegramMessage } from './services/telegram';
 import { syncTbytRecords, fixPostgresSequences } from './syncTbytData';
 import { syncCnttRecords } from './syncCnttData';
 
@@ -84,6 +87,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/committee', committeeRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check & Database connection diagnostic endpoint for Coolify / Docker
 app.get('/api/health', async (req, res) => {
@@ -108,7 +112,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Admin: DB status & diagnostic — GET /api/admin/db-status
-app.get('/api/admin/db-status', async (req, res) => {
+app.get('/api/admin/db-status', requireAuth, requireAdmin, async (req, res) => {
   try {
     const isPg = (process.env.DATABASE_URL || '').toLowerCase().includes('postgres');
     const assetCount = await prisma.asset.count().catch(() => -1);
@@ -133,11 +137,19 @@ app.get('/api/admin/db-status', async (req, res) => {
       where: { managingUnit: 'DUOC' }
     }).catch(() => -1);
 
+    const { config: tgCfg, source: tgSource } = await getTelegramConfig();
+    const telegramConfigured = Boolean(
+      tgCfg.enabled &&
+        tgCfg.botToken &&
+        (tgCfg.defaultChatId || tgCfg.chatIdDuoc || tgCfg.chatIdCntt || tgCfg.chatIdTchc)
+    );
+
     res.json({
       ok: true,
       dbType: isPg ? 'PostgreSQL' : 'SQLite',
       databaseUrl: (process.env.DATABASE_URL || 'NOT_SET').replace(/:\/\/.*@/, '://***@'),
-      telegramConfigured: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+      telegramConfigured,
+      telegramSource: tgSource,
       counts: { assets: assetCount, maintenance: maintCount, calibrations: calibCount, plannedMaintenance: pmCount, contaminatedMaint: contaminated, duocMaint },
       plannedMaintenanceError: pmError,
       time: new Date().toISOString()
@@ -148,81 +160,65 @@ app.get('/api/admin/db-status', async (req, res) => {
 });
 
 // Admin: Test Telegram configuration — GET or POST /api/admin/test-telegram
-app.all('/api/admin/test-telegram', async (req, res) => {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-
-  const maskedToken = token ? `${token.substring(0, 10)}...${token.substring(token.length - 4)}` : null;
+app.all('/api/admin/test-telegram', requireAuth, requireAdmin, async (req, res) => {
+  const { config: tgCfg, source: tgSource } = await getTelegramConfig();
+  const token = tgCfg.botToken;
+  const chatId = tgCfg.defaultChatId || tgCfg.chatIdDuoc || tgCfg.chatIdCntt || tgCfg.chatIdTchc;
+  const maskedToken = maskBotToken(token);
 
   if (!token || !chatId) {
     return res.status(400).json({
       ok: false,
       status: 'MISSING_ENV_VARS',
-      message: 'Chưa cấu hình đầy đủ biến môi trường trên Coolify.',
+      message: 'Chưa cấu hình đầy đủ Telegram Bot Token và Chat ID (vào mục Hệ thống → Cài đặt & Telegram hoặc thiết lập biến môi trường).',
       envStatus: {
         TELEGRAM_BOT_TOKEN: token ? `Đã cấu hình (${maskedToken})` : 'CHƯA CẤU HÌNH (trống)',
         TELEGRAM_CHAT_ID: chatId ? `Đã cấu hình (${chatId})` : 'CHƯA CẤU HÌNH (trống)'
       },
       guide: [
-        '1. Truy cập trang quản trị ứng dụng trên Coolify -> Environment Variables',
-        '2. Thêm TELEGRAM_BOT_TOKEN = <token từ BotFather>',
-        '3. Thêm TELEGRAM_CHAT_ID = <chat ID của group telegram>',
-        '4. Lưu và Redeploy lại ứng dụng'
+        '1. Đăng nhập Admin -> mở mục Hệ thống -> Cài đặt & Telegram trong phần mềm',
+        '2. Dán TELEGRAM_BOT_TOKEN (từ @BotFather) -> bấm Tự dò Group ID để chọn nhóm',
+        '3. Bấm Lưu cấu hình và Gửi tin nhắn thử nghiệm'
       ]
     });
   }
 
-  try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const nowStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-    const testText = [
-      `🔔 <b>QLTS CDC ĐÀ NẴNG - TEST KẾT NỐI</b>`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `✅ Kết nối Bot Telegram thành công!`,
-      `🕐 Thời gian: ${nowStr}`,
-      `📌 Từ nay các yêu cầu báo hỏng thiết bị y tế / CNTT sẽ tự động gửi thông báo về nhóm này.`
-    ].join('\n');
+  const nowStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const testText = [
+    `🔔 <b>QLTS CDC ĐÀ NẴNG - TEST KẾT NỐI</b>`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `✅ Kết nối Bot Telegram thành công! (${tgSource === 'db' ? 'Cài đặt giao diện' : 'Biến môi trường'})`,
+    `🕐 Thời gian: ${nowStr}`,
+    `📌 Từ nay các yêu cầu báo hỏng thiết bị y tế / CNTT / TCHC sẽ tự động gửi thông báo về nhóm này.`
+  ].join('\n');
 
-    const tgRes = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: testText,
-        parse_mode: 'HTML'
-      })
-    });
+  const result = await sendTelegramMessage(testText, {
+    tokenOverride: token,
+    chatIdOverride: chatId,
+    ignoreDisabled: true,
+  });
 
-    const tgData: any = await tgRes.json();
-
-    if (!tgRes.ok || !tgData.ok) {
-      return res.status(400).json({
-        ok: false,
-        status: 'TELEGRAM_REJECTED',
-        message: 'Telegram API từ chối gửi tin nhắn. Vui lòng kiểm tra lại token hoặc chat_id.',
-        config: { botToken: maskedToken, chatId },
-        telegramError: tgData
-      });
-    }
-
-    res.json({
-      ok: true,
-      status: 'SUCCESS',
-      message: 'Đã gửi tin nhắn thử nghiệm thành công tới nhóm Telegram!',
-      config: { botToken: maskedToken, chatId },
-      telegramResponse: tgData
-    });
-  } catch (err: any) {
-    res.status(500).json({
+  if (!result.ok) {
+    return res.status(400).json({
       ok: false,
-      status: 'NETWORK_ERROR',
-      message: `Lỗi kết nối tới api.telegram.org: ${err.message}`
+      status: 'TELEGRAM_REJECTED',
+      message: `Telegram API từ chối gửi tin: ${result.error}`,
+      config: { botToken: maskedToken, chatId, source: tgSource },
+      telegramError: result.telegramResponse
     });
   }
+
+  res.json({
+    ok: true,
+    status: 'SUCCESS',
+    message: 'Đã gửi tin nhắn thử nghiệm thành công tới nhóm Telegram!',
+    config: { botToken: maskedToken, chatId, source: tgSource },
+    telegramResponse: result.telegramResponse
+  });
 });
 
-// Admin: Force TBYT sync — POST /api/admin/sync-tbyt (no auth required for emergency access)
-app.post('/api/admin/sync-tbyt', async (req, res) => {
+// Admin: Force TBYT sync — POST /api/admin/sync-tbyt
+app.post('/api/admin/sync-tbyt', requireAuth, requireAdmin, async (req, res) => {
   const logs: string[] = [];
   const log = (msg: string) => { console.log(msg); logs.push(msg); };
 
@@ -264,8 +260,8 @@ app.post('/api/admin/sync-tbyt', async (req, res) => {
   }
 });
 
-// Admin: Force CNTT sync — GET & POST /api/admin/sync-cntt (no auth required for emergency access)
-app.all('/api/admin/sync-cntt', async (req, res) => {
+// Admin: Force CNTT sync — GET & POST /api/admin/sync-cntt
+app.all('/api/admin/sync-cntt', requireAuth, requireAdmin, async (req, res) => {
   const logs: string[] = [];
   const log = (msg: string) => { console.log(msg); logs.push(msg); };
 
@@ -616,6 +612,14 @@ async function autoMigrateAndSeed() {
 
     // 1. Dynamic safe column patch for existing databases (prevents missing column errors)
     await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SystemSetting" (
+        "key" TEXT PRIMARY KEY,
+        "value" TEXT NOT NULL,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "PlannedMaintenance" (
         "id" SERIAL PRIMARY KEY,
         "assetId" INTEGER NOT NULL REFERENCES "Asset"("id") ON DELETE CASCADE,
@@ -639,6 +643,7 @@ async function autoMigrateAndSeed() {
 
     const tablesToPatch = [
       { table: 'Asset', column: 'oldAssetCode', type: 'TEXT' },
+      { table: 'Asset', column: 'assetGroup', type: 'TEXT' },
       { table: 'Asset', column: 'fundingSource', type: 'TEXT' },
       { table: 'Asset', column: 'decisionNumber', type: 'TEXT' },
       { table: 'MaintenanceRequest', column: 'fundingSource', type: 'TEXT' },
@@ -664,7 +669,7 @@ async function autoMigrateAndSeed() {
 
     // 2. Ensure 20 default users exist and passwords are valid
     const defaultUsers = [
-      { username: 'admin', role: 'ADMIN', fullName: 'Quản Trị Viên Tối Cao (Ban Giám Đốc)', pass: 'admin123' },
+      { username: 'admin', role: 'ADMIN', fullName: 'Admin', pass: 'admin123' },
       { username: 'manager_duoc', role: 'MANAGER_DUOC', fullName: 'Quản Lý Tài Sản - Khoa Dược (TBYT)', pass: '123456' },
       { username: 'manager_cntt', role: 'MANAGER_CNTT', fullName: 'Quản Lý Tài Sản - Tổ CNTT', pass: '123456' },
       { username: 'manager_tchc', role: 'MANAGER_TCHC', fullName: 'Quản Lý Tài Sản - Phòng TCHC', pass: '123456' },
@@ -704,11 +709,22 @@ async function autoMigrateAndSeed() {
             departmentId: deptId
           }
         });
-      } else if (existing.role !== u.role || (deptId && existing.departmentId !== deptId)) {
-        await prisma.user.update({
-          where: { id: existing.id },
-          data: { role: u.role, departmentId: deptId || existing.departmentId }
-        });
+      } else {
+        const needsRoleFix = existing.role !== u.role || (deptId && existing.departmentId !== deptId);
+        const needsAdminNameFix =
+          existing.username === 'admin' &&
+          typeof existing.fullName === 'string' &&
+          existing.fullName.includes('Quản Trị Viên Tối Cao');
+        if (needsRoleFix || needsAdminNameFix) {
+          await prisma.user.update({
+            where: { id: existing.id },
+            data: {
+              role: u.role,
+              departmentId: deptId || existing.departmentId,
+              ...(needsAdminNameFix ? { fullName: u.fullName } : {}),
+            },
+          });
+        }
       }
     }
     // 3. Resilient CNTT Asset synchronization (exact codes per department from Excel)

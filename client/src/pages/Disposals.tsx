@@ -8,9 +8,16 @@ import {
 import { apiGet, apiPost, apiPut } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Asset, CommitteeMember, Department } from '../types';
+import { matchesSmartSearchClient } from '../utils/superSortSearch';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
+import DataTableShell, { useTablePrefs } from '../components/ui/DataTableShell';
+import AssetPickerTable from '../components/ui/AssetPickerTable';
 
 export default function Disposals() {
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'CAMPAIGNS' | 'PROPOSALS' | 'INSPECTIONS' | 'BOARD_MEETING'>('PROPOSALS');
   
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -29,6 +36,7 @@ export default function Disposals() {
   const defaultDept = user?.role === 'DEPARTMENT' && user.departmentId ? user.departmentId.toString() : 'ALL';
 
   const [selectedManagingUnit, setSelectedManagingUnit] = useState<string>(defaultUnit);
+  const { density, setDensity, cellPy, headPy } = useTablePrefs('disposals');
   const [selectedDeptId, setSelectedDeptId] = useState<string>(defaultDept);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -121,7 +129,7 @@ export default function Disposals() {
       const [cRes, dRes, aRes, deptRes, mRes] = await Promise.allSettled([
         apiGet('/disposals/campaigns'),
         apiGet('/disposals'),
-        apiGet('/assets?limit=500'),
+        apiGet('/assets?limit=10000'),
         apiGet('/departments'),
         apiGet('/committee')
       ]);
@@ -155,13 +163,8 @@ export default function Disposals() {
     if (modalUnitFilter !== 'ALL' && (a as any).managingUnit !== modalUnitFilter) {
       return false;
     }
-    if (modalAssetSearch.trim()) {
-      const q = modalAssetSearch.toLowerCase();
-      const matchCode = a.assetCode?.toLowerCase().includes(q);
-      const matchName = a.name?.toLowerCase().includes(q);
-      const matchSpec = a.specifications?.toLowerCase().includes(q);
-      const matchLoc = a.locationDetail?.toLowerCase().includes(q) || (a as any).floor?.toLowerCase().includes(q);
-      if (!matchCode && !matchName && !matchSpec && !matchLoc) return false;
+    if (modalAssetSearch.trim() && !matchesSmartSearchClient(a, modalAssetSearch)) {
+      return false;
     }
     return true;
   });
@@ -185,7 +188,7 @@ export default function Disposals() {
   // Bước 1 -> Bước 2: Bấm "Tổng Hợp Đề Xuất" để lập bảng chi tiết từng tài sản
   const handleProceedToSummary = () => {
     if (selectedAssetIds.length === 0) {
-      alert('Vui lòng tích chọn ít nhất 1 tài sản để tổng hợp đề xuất thanh lý!');
+      toast.warning('Vui lòng tích chọn ít nhất 1 tài sản để tổng hợp đề xuất thanh lý!');
       return;
     }
     const selectedAssets = candidateAssets.filter(a => selectedAssetIds.includes(a.id));
@@ -232,18 +235,18 @@ export default function Disposals() {
   const handleSendSummaryProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (proposalItems.length === 0) {
-      alert('Danh sách tài sản đề xuất thanh lý đang trống! Vui lòng chọn tài sản.');
+      toast.warning('Danh sách tài sản đề xuất thanh lý đang trống! Vui lòng chọn tài sản.');
       return;
     }
 
     const emptyReasonItem = proposalItems.find(it => !it.reason || !it.reason.trim());
     if (emptyReasonItem) {
-      alert(`Vui lòng điền lý do thanh lý cho tài sản: [${emptyReasonItem.asset.assetCode}] ${emptyReasonItem.asset.name}`);
+      toast.warning(`Vui lòng điền lý do thanh lý cho tài sản: [${emptyReasonItem.asset.assetCode}] ${emptyReasonItem.asset.name}`);
       return;
     }
 
     if (!proposalData.proposedBy.trim()) {
-      alert('Vui lòng điền họ tên người lập bảng tổng hợp đề xuất!');
+      toast.warning('Vui lòng điền họ tên người lập bảng tổng hợp đề xuất!');
       return;
     }
 
@@ -259,7 +262,7 @@ export default function Disposals() {
         departmentId: user?.departmentId || undefined
       });
 
-      alert(`Đã gửi bảng tổng hợp đề xuất thanh lý cho ${proposalItems.length} tài sản thành công!`);
+      toast.success(`Đã gửi bảng tổng hợp đề xuất thanh lý cho ${proposalItems.length} tài sản thành công!`);
       setShowCreateProposalModal(false);
       setProposalStep(1);
       setSelectedAssetIds([]);
@@ -267,7 +270,7 @@ export default function Disposals() {
       setModalAssetSearch('');
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi gửi bảng tổng hợp đề xuất');
+      toast.error(err.message || 'Lỗi khi gửi bảng tổng hợp đề xuất');
     }
   };
 
@@ -295,33 +298,45 @@ export default function Disposals() {
       await apiPut(`/disposals/${selectedDisposal.id}/inspect`, inspectionData);
       setShowInspectionModal(false);
       loadData();
-      alert('Đã lập và lưu Biên bản kiểm tra tình trạng kỹ thuật thành công!');
+      toast.success('Đã lập và lưu Biên bản kiểm tra tình trạng kỹ thuật thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi lập biên bản kiểm tra');
+      toast.error(e.message || 'Lỗi khi lập biên bản kiểm tra');
     }
   };
 
   // Board Approves
   const handleApprove = async (id: number) => {
-    if (!window.confirm('Hội đồng thanh lý xác nhận phê duyệt đề xuất thanh lý tài sản này?')) return;
+    const ok = await confirm({
+      title: 'Phê duyệt đề xuất thanh lý',
+      message: 'Hội đồng thanh lý xác nhận phê duyệt đề xuất thanh lý tài sản này?',
+      confirmLabel: 'Phê duyệt',
+      variant: 'primary',
+    });
+    if (!ok) return;
     try {
       await apiPut(`/disposals/${id}/approve`, {});
       loadData();
-      alert('Đã phê duyệt đề xuất thanh lý!');
+      toast.success('Đã phê duyệt đề xuất thanh lý!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi duyệt');
+      toast.error(e.message || 'Lỗi khi duyệt');
     }
   };
 
   // Complete Disposal
   const handleComplete = async (id: number) => {
-    if (!window.confirm('Xác nhận hoàn tất thanh lý? Tài sản sẽ chuyển sang trạng thái ĐÃ THANH LÝ.')) return;
+    const ok = await confirm({
+      title: 'Hoàn tất thanh lý tài sản',
+      message: 'Xác nhận hoàn tất thanh lý? Tài sản sẽ chuyển sang trạng thái ĐÃ THANH LÝ.',
+      confirmLabel: 'Xác nhận hoàn tất',
+      variant: 'warning',
+    });
+    if (!ok) return;
     try {
       await apiPut(`/disposals/${id}/complete`, {});
       loadData();
-      alert('Đã hoàn tất thanh lý tài sản!');
+      toast.success('Đã hoàn tất thanh lý tài sản!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi hoàn tất');
+      toast.error(e.message || 'Lỗi khi hoàn tất');
     }
   };
 
@@ -332,9 +347,9 @@ export default function Disposals() {
       await apiPost('/disposals/campaigns', campaignForm);
       setShowCreateCampaignModal(false);
       loadData();
-      alert('Đã ban hành thông báo đợt thanh lý thành công!');
+      toast.success('Đã ban hành thông báo đợt thanh lý thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi tạo thông báo');
+      toast.error(e.message || 'Lỗi khi tạo thông báo');
     }
   };
 
@@ -513,9 +528,9 @@ export default function Disposals() {
 
       {/* TAB 2 & 3: DANH SÁCH ĐỀ XUẤT & THẨM ĐỊNH KỸ THUẬT */}
       {(activeTab === 'PROPOSALS' || activeTab === 'INSPECTIONS') && (
-        <div className="print:hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden space-y-0">
+        <div className="print:hidden space-y-3">
           {/* Filters Bar */}
-          <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+          <div className="p-4 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={selectedManagingUnit}
@@ -555,93 +570,137 @@ export default function Disposals() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600 font-bold uppercase border-b border-slate-200">
-                <tr>
-                  <th className="p-3.5">Mã tài sản</th>
-                  <th className="p-3.5 min-w-[180px]">Tên thiết bị đề xuất</th>
-                  <th className="p-3.5">Khoa / Phòng</th>
-                  <th className="p-3.5">Khối nhận báo cáo</th>
-                  <th className="p-3.5 min-w-[180px]">Lý do đề xuất</th>
-                  <th className="p-3.5 min-w-[180px]">Đánh giá kỹ thuật</th>
-                  <th className="p-3.5">Trạng thái</th>
-                  <th className="p-3.5 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={8} className="text-center py-12 text-slate-400">Đang tải danh sách đề xuất...</td></tr>
-                ) : filteredDisposals.length === 0 ? (
-                  <tr><td colSpan={8} className="text-center py-12 text-slate-400">Chưa có đề xuất thanh lý nào phù hợp.</td></tr>
-                ) : (
-                  filteredDisposals.map((item: any) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3.5 font-mono font-bold text-blue-700">{item.asset?.assetCode}</td>
-                      <td className="p-3.5 font-bold text-slate-900">{item.asset?.name}</td>
-                      <td className="p-3.5 text-slate-700 font-medium">{item.asset?.department?.name || 'CDC'}</td>
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          item.asset?.managingUnit === 'DUOC' ? 'bg-emerald-100 text-emerald-800' :
-                          item.asset?.managingUnit === 'CNTT' ? 'bg-blue-100 text-blue-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
-                          {item.asset?.managingUnit === 'DUOC' ? 'Khoa Dược' :
-                           item.asset?.managingUnit === 'CNTT' ? 'Tổ CNTT' : 'Phòng TCHC'}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-slate-600 max-w-xs">{item.reason}</td>
-                      <td className="p-3.5 text-slate-600 max-w-xs">
-                        {item.technicalAssessment ? (
-                          <span className="text-slate-800 font-medium">{item.technicalAssessment}</span>
-                        ) : (
-                          <span className="text-slate-400 italic">Chưa thẩm định</span>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          item.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                          item.status === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
-                          item.status === 'INSPECTED' ? 'bg-purple-100 text-purple-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
-                          {item.status === 'COMPLETED' ? 'Đã thanh lý' :
-                           item.status === 'APPROVED' ? 'HĐ đã duyệt' :
-                           item.status === 'INSPECTED' ? 'Đã thẩm định KT' : 'Chờ thẩm định KT'}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                        {item.status === 'PROPOSED' && (
-                          <button
-                            onClick={() => handleOpenInspection(item)}
-                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+          <DataTableShell
+            title="Danh sách đề xuất & thẩm định thanh lý"
+            totalCount={filteredDisposals.length}
+            countLabel="đề xuất"
+            density={density}
+            onDensityChange={setDensity}
+            loading={loading}
+            isEmpty={filteredDisposals.length === 0}
+            emptyMessage="Chưa có đề xuất thanh lý nào phù hợp."
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                  <tr>
+                    <th className={`${headPy} px-3.5 w-28 whitespace-nowrap`}>Mã TS</th>
+                    <th className={`${headPy} px-3.5 min-w-[230px] whitespace-nowrap`}>Thiết bị &amp; Khoa</th>
+                    <th className={`${headPy} px-3.5 whitespace-nowrap`}>Khối nhận</th>
+                    <th className={`${headPy} px-3.5 min-w-[250px] whitespace-nowrap`}>Lý do &amp; Đánh giá KT</th>
+                    <th className={`${headPy} px-3.5 whitespace-nowrap`}>Trạng thái</th>
+                    <th className={`${headPy} px-3.5 w-32 text-right whitespace-nowrap`}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {!loading &&
+                    filteredDisposals.map((item: any) => (
+                      <tr key={item.id} className="hover:bg-slate-50/75 transition-colors">
+                        <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 font-mono text-[11px] font-medium text-blue-700">
+                            {item.asset?.assetCode || '-'}
+                          </span>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top max-w-[300px]`}>
+                          <div className="font-heading font-semibold text-slate-800 leading-snug line-clamp-2" title={item.asset?.name}>
+                            {item.asset?.name}
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-500 truncate">
+                            {item.asset?.department?.name || 'CDC'}
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                              item.asset?.managingUnit === 'DUOC'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                : item.asset?.managingUnit === 'CNTT'
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200/70'
+                            }`}
                           >
-                            Thẩm định KT
-                          </button>
-                        )}
-                        {item.status === 'INSPECTED' && (
-                          <button
-                            onClick={() => handleApprove(item.id)}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                            {item.asset?.managingUnit === 'DUOC'
+                              ? 'Khoa Dược'
+                              : item.asset?.managingUnit === 'CNTT'
+                                ? 'Tổ CNTT'
+                                : 'Phòng TCHC'}
+                          </span>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top max-w-[340px]`}>
+                          <div className="text-slate-700 line-clamp-2 leading-snug" title={item.reason}>
+                            {item.reason}
+                          </div>
+                          <div className="mt-1 text-[11px] line-clamp-2 leading-snug break-words">
+                            {item.technicalAssessment ? (
+                              <span className="text-slate-600 font-medium">
+                                KT: {item.technicalAssessment}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic">Chưa thẩm định kỹ thuật</span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                              item.status === 'COMPLETED'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                : item.status === 'APPROVED'
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                  : item.status === 'INSPECTED'
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
+                                    : 'bg-amber-50 text-amber-800 border border-amber-200/70'
+                            }`}
                           >
-                            HĐ Duyệt
-                          </button>
-                        )}
-                        {item.status === 'APPROVED' && (
-                          <button
-                            onClick={() => handleComplete(item.id)}
-                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
-                          >
-                            Hoàn tất
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                            {item.status === 'COMPLETED'
+                              ? 'Đã thanh lý'
+                              : item.status === 'APPROVED'
+                                ? 'HĐ đã duyệt'
+                                : item.status === 'INSPECTED'
+                                  ? 'Đã thẩm định KT'
+                                  : 'Chờ thẩm định KT'}
+                          </span>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top text-right whitespace-nowrap`}>
+                          {item.status === 'PROPOSED' && (
+                            <button
+                              onClick={() => handleOpenInspection(item)}
+                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                            >
+                              Thẩm định KT
+                            </button>
+                          )}
+                          {item.status === 'INSPECTED' && (
+                            <button
+                              onClick={() => handleApprove(item.id)}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                            >
+                              HĐ Duyệt
+                            </button>
+                          )}
+                          {item.status === 'APPROVED' && (
+                            <button
+                              onClick={() => handleComplete(item.id)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                            >
+                              Hoàn tất
+                            </button>
+                          )}
+                          {item.status === 'COMPLETED' && (
+                            <span className="text-[11px] text-slate-400 font-medium">Đã hoàn tất</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </DataTableShell>
         </div>
       )}
 
@@ -1068,98 +1127,17 @@ export default function Disposals() {
                   </div>
 
                   {/* Bảng chia cột danh sách tài sản đề xuất thanh lý */}
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
-                    <div className="max-h-72 overflow-y-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead className="bg-slate-100/90 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
-                          <tr>
-                            <th className="p-2.5 text-center w-12">Chọn</th>
-                            <th className="p-2.5 w-32">Mã tài sản</th>
-                            <th className="p-2.5">Tên tài sản / Thiết bị</th>
-                            <th className="p-2.5 w-40">Người sử dụng</th>
-                            <th className="p-2.5 w-36">Vị trí phòng máy</th>
-                            <th className="p-2.5 w-20 text-center">Năm SD</th>
-                            <th className="p-2.5 w-28 text-right">Nguyên giá</th>
-                            <th className="p-2.5 w-28 text-center">Đơn vị</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {filteredCandidateAssets.length === 0 ? (
-                            <tr>
-                              <td colSpan={8} className="p-8 text-center text-slate-400 text-xs">
-                                Không tìm thấy tài sản nào thuộc danh mục của đơn vị phù hợp điều kiện tìm kiếm.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredCandidateAssets.map(asset => {
-                              const isSelected = selectedAssetIds.includes(asset.id);
-                              return (
-                                <tr
-                                  key={asset.id}
-                                  onClick={() => toggleSelectAsset(asset.id)}
-                                  className={`transition cursor-pointer select-none ${
-                                    isSelected 
-                                      ? 'bg-blue-50/95 font-medium text-blue-900 border-l-4 border-blue-600' 
-                                      : 'hover:bg-slate-50/80 text-slate-700'
-                                  }`}
-                                >
-                                  <td className="p-2.5 text-center align-middle">
-                                    <div className="pt-0.5 text-blue-600 flex items-center justify-center">
-                                      {isSelected ? (
-                                        <CheckSquare className="w-4 h-4 fill-blue-600 text-white" />
-                                      ) : (
-                                        <Square className="w-4 h-4 text-slate-400" />
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="p-2.5 align-middle">
-                                    <span className="font-mono font-bold text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded text-[11px] border border-blue-200 inline-block">
-                                      {asset.assetCode}
-                                    </span>
-                                  </td>
-                                  <td className="p-2.5 align-middle">
-                                    <div className="font-bold text-slate-900">{asset.name}</div>
-                                    {asset.specifications && (
-                                      <div className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5">{asset.specifications}</div>
-                                    )}
-                                  </td>
-                                  <td className="p-2.5 align-middle">
-                                    {asset.assignedTo ? (
-                                      <span className="font-semibold text-slate-800 flex items-center gap-1">
-                                        <span>👤</span> <span>{asset.assignedTo}</span>
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-400 italic">Chưa gán</span>
-                                    )}
-                                  </td>
-                                  <td className="p-2.5 align-middle">
-                                    <span className="text-slate-700 flex items-center gap-1">
-                                      <span>📍</span> <span>{asset.locationDetail || (asset as any).floor || 'Tại khoa'}</span>
-                                    </span>
-                                  </td>
-                                  <td className="p-2.5 text-center align-middle font-mono text-slate-600">
-                                    {asset.yearInUse || '-'}
-                                  </td>
-                                  <td className="p-2.5 text-right align-middle font-mono text-slate-700">
-                                    {asset.originalPrice ? Number(asset.originalPrice).toLocaleString('vi-VN') + ' đ' : '-'}
-                                  </td>
-                                  <td className="p-2.5 text-center align-middle">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                      asset.managingUnit === 'DUOC' ? 'bg-emerald-100 text-emerald-800' :
-                                      asset.managingUnit === 'CNTT' ? 'bg-blue-100 text-blue-800' :
-                                      'bg-amber-100 text-amber-800'
-                                    }`}>
-                                      {asset.managingUnit === 'DUOC' ? 'Khoa Dược' : asset.managingUnit === 'CNTT' ? 'Tổ CNTT' : 'TCHC'}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  <AssetPickerTable
+                    mode="multi"
+                    assets={filteredCandidateAssets}
+                    selectedIds={selectedAssetIds}
+                    onToggle={toggleSelectAsset}
+                    showDepartment={false}
+                    showPrice={true}
+                    accentColor="blue"
+                    maxHeightClass="max-h-72"
+                    emptyMessage="Không tìm thấy tài sản nào thuộc danh mục của đơn vị phù hợp điều kiện tìm kiếm."
+                  />
                 </div>
 
                 <div className="flex justify-between items-center pt-4 border-t border-slate-100">

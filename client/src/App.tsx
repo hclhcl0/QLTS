@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './components/ui/Toast';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import Layout from './components/Layout';
 
 // Pages
@@ -20,8 +22,17 @@ import PlannedMaintenance from './pages/PlannedMaintenance';
 import QRScanner from './pages/QRScanner';
 import Departments from './pages/Departments';
 import Users from './pages/Users';
+import Settings from './pages/Settings';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function ProtectedRoute({ 
   children, 
@@ -56,7 +67,7 @@ function AppRoutes() {
         <Route path="transfers" element={<Transfers />} />
         <Route path="maintenance" element={<Maintenance />} />
         <Route path="planned-maintenance" element={
-          <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER_DUOC', 'DEPARTMENT']}>
+          <ProtectedRoute allowedRoles={['ADMIN', 'VIEWER', 'MANAGER_DUOC', 'DEPARTMENT']}>
             <PlannedMaintenance />
           </ProtectedRoute>
         } />
@@ -71,6 +82,9 @@ function AppRoutes() {
         <Route path="users" element={
           <ProtectedRoute adminOnly><Users /></ProtectedRoute>
         } />
+        <Route path="settings" element={
+          <ProtectedRoute adminOnly><Settings /></ProtectedRoute>
+        } />
       </Route>
     </Routes>
   );
@@ -79,11 +93,15 @@ function AppRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </AuthProvider>
+        </ConfirmProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

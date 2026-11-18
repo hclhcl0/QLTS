@@ -2,11 +2,10 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+import { requireAuth, requireAdmin, JWT_SECRET } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
-const SECRET_KEY = 'qlts-cdc-danang-secret-key-2026';
 
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -25,7 +24,7 @@ router.post('/login', async (req, res) => {
     // If user does not exist in SQLite database (e.g. fresh volume on Coolify), auto-create from default directory
     if (!user) {
       const defaultUserMap: Record<string, { role: string; fullName: string; deptCode?: string }> = {
-        'admin': { role: 'ADMIN', fullName: 'Quản Trị Viên Tối Cao (Ban Giám Đốc)' },
+        'admin': { role: 'ADMIN', fullName: 'Admin' },
         'manager_duoc': { role: 'MANAGER_DUOC', fullName: 'Quản Lý Tài Sản - Khoa Dược (TBYT)' },
         'manager_cntt': { role: 'MANAGER_CNTT', fullName: 'Quản Lý Tài Sản - Tổ CNTT' },
         'manager_tchc': { role: 'MANAGER_TCHC', fullName: 'Quản Lý Tài Sản - Phòng TCHC' },
@@ -71,31 +70,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không chính xác' });
     }
 
-    // Check password match
+    // Check password match strictly via bcrypt
     let isMatch = false;
     try {
       isMatch = await bcrypt.compare(cleanPassword, user.password);
     } catch {}
-
-    // Password fallbacks
-    if (!isMatch) {
-      if (cleanUsername === 'admin' && (cleanPassword === 'admin123' || cleanPassword === '123456' || cleanPassword === 'admin')) {
-        isMatch = true;
-      } else if (cleanPassword === '123456' || cleanPassword === 'admin123') {
-        isMatch = true;
-      }
-
-      // If matched via fallback, auto-update password hash in database
-      if (isMatch) {
-        try {
-          const updatedHash = await bcrypt.hash(cleanPassword, 10);
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { password: updatedHash }
-          });
-        } catch {}
-      }
-    }
 
     if (!isMatch) {
       return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không chính xác' });
@@ -103,7 +82,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { userId: user.id, role: user.role, departmentId: user.departmentId, username: user.username },
-      SECRET_KEY,
+      JWT_SECRET,
       { expiresIn: '30d' }
     );
 
@@ -157,19 +136,11 @@ router.post('/change-password', requireAuth, async (req: any, res) => {
       return res.status(404).json({ error: 'Không tìm thấy tài khoản người dùng' });
     }
 
-    // Verify current password
+    // Verify current password strictly via bcrypt
     let isMatch = false;
     try {
       isMatch = await bcrypt.compare(currentPassword, user.password);
     } catch {}
-
-    if (!isMatch) {
-      if (user.username === 'admin' && (currentPassword === 'admin123' || currentPassword === '123456' || currentPassword === 'admin')) {
-        isMatch = true;
-      } else if (currentPassword === '123456' || currentPassword === 'admin123') {
-        isMatch = true;
-      }
-    }
 
     if (!isMatch) {
       return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác' });
@@ -186,6 +157,10 @@ router.post('/change-password', requireAuth, async (req: any, res) => {
     console.error('Error changing password:', error);
     res.status(500).json({ error: 'Lỗi máy chủ khi đổi mật khẩu' });
   }
+});
+
+router.get('/me', requireAuth, async (req: any, res) => {
+  res.json({ user: req.user });
 });
 
 export default router;

@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Building2, Monitor, Stethoscope, Layers, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Monitor, Stethoscope, Layers, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut } from '../lib/api';
-import { AssetCategory, Department } from '../types';
+import { AssetCategory, Department, STANDARD_FLOORS, TCHC_GROUP_OPTIONS, TCHC_GROUP_META } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast';
 
 const FALLBACK_CATEGORIES: AssetCategory[] = [
   { id: 1, code: 'DUOC', name: 'Trang thiết bị Y tế (Khoa Dược quản lý)', description: 'Máy xét nghiệm, siêu âm, chẩn đoán, vắc xin...' },
   { id: 2, code: 'CNTT', name: 'Thiết bị Công nghệ thông tin (Tổ CNTT quản lý)', description: 'PC, Laptop, Máy in, Scan, Mạng, Server...' },
-  { id: 3, code: 'TCHC', name: 'Thiết bị Hành chính & CCDC (Phòng TCHC quản lý)', description: 'Bàn ghế, tủ sắt, quạt, giường inox...' },
-  { id: 4, code: 'TBVP_TOANHA', name: 'Cơ sở vật chất & Hạ tầng tòa nhà theo tầng (TCHC)', description: 'Công tắc, ổ cắm, đèn led, tủ điện, PCCC theo tầng' }
+  { id: 3, code: 'TCHC', name: 'Trang bị Hành chính & Nội thất (Phòng TCHC)', description: 'Bàn ghế, tủ kệ, gia dụng, xe phục vụ...' },
+  { id: 4, code: 'TBVP_TOANHA', name: 'Cơ điện & Hạ tầng Tòa nhà M&E (Phòng TCHC)', description: 'Điện chiếu sáng, HVAC, PCCC, Cấp thoát nước' }
 ];
 
-const FLOORS = ['Tầng Hầm', 'Tầng 1', 'Tầng 2', 'Tầng 3', 'Tầng 4', 'Tầng 5', 'Tầng 6', 'Tầng 7'];
+const FLOORS = STANDARD_FLOORS;
 
 export default function AssetForm() {
   const { user } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const isEdit = Boolean(id);
 
   const [categories, setCategories] = useState<AssetCategory[]>(FALLBACK_CATEGORIES);
@@ -25,6 +29,7 @@ export default function AssetForm() {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(isEdit);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Determine initial managingUnit and default category code by role
   const isCntt = user?.role === 'MANAGER_CNTT';
@@ -41,6 +46,7 @@ export default function AssetForm() {
     categoryId: isCntt ? '2' : isTchc ? '3' : '1',
     departmentId: '1',
     managingUnit: defaultRoleUnit,
+    assetGroup: '',
     floor: 'Tầng 1',
     buildingAsset: 0,
     location: 'Cơ sở 1',
@@ -101,7 +107,8 @@ export default function AssetForm() {
               categoryId: (assetData.categoryId || matchedCat?.id || 1).toString(),
               departmentId: (assetData.departmentId || 1).toString(),
               managingUnit: assetData.managingUnit || defaultRoleUnit,
-              floor: assetData.floor || 'Tầng 1',
+              assetGroup: assetData.assetGroup || '',
+              floor: assetData.floor || '',
               buildingAsset: assetData.buildingAsset || 0,
               location: assetData.location || 'Cơ sở 1',
               locationDetail: assetData.locationDetail || '',
@@ -169,18 +176,28 @@ export default function AssetForm() {
     if (isDuoc) mUnit = 'DUOC';
     if (isTchc) mUnit = 'TCHC';
 
-    setFormData(prev => ({
-      ...prev,
-      categoryId: catIdStr,
-      managingUnit: mUnit,
-      buildingAsset: isBuilding
-    }));
+    setFormData(prev => {
+      const nextScope = isBuilding === 1 ? 'ME' : 'HC';
+      const currentMeta = prev.assetGroup ? TCHC_GROUP_META[prev.assetGroup] : null;
+      const keepAssetGroup =
+        mUnit === 'TCHC' && currentMeta && currentMeta.scope === nextScope ? prev.assetGroup : '';
+      return {
+        ...prev,
+        categoryId: catIdStr,
+        managingUnit: mUnit,
+        buildingAsset: isBuilding,
+        assetGroup: keepAssetGroup,
+      };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!formData.assetCode || !formData.name || !formData.categoryId || !formData.departmentId) {
-      alert('Vui lòng điền các trường bắt buộc: Mã tài sản, Tên tài sản, Danh mục, Khoa phòng');
+      const msg = 'Vui lòng điền các trường bắt buộc: Mã tài sản, Tên tài sản, Danh mục, Khoa phòng';
+      setFormError(msg);
+      toast.warning(msg);
       return;
     }
 
@@ -188,6 +205,8 @@ export default function AssetForm() {
     try {
       const payload = {
         ...formData,
+        assetGroup: formData.managingUnit === 'TCHC' && formData.assetGroup ? formData.assetGroup : null,
+        floor: formData.floor || null,
         categoryId: parseInt(formData.categoryId),
         departmentId: parseInt(formData.departmentId),
         yearInUse: formData.yearInUse ? parseInt(formData.yearInUse) : undefined,
@@ -197,14 +216,18 @@ export default function AssetForm() {
 
       if (isEdit && id) {
         await apiPut(`/assets/${id}`, payload);
-        alert('Cập nhật thông tin thiết bị thành công!');
+        toast.success('Cập nhật thông tin thiết bị thành công!');
       } else {
         await apiPost('/assets', payload);
-        alert('Thêm mới thiết bị thành công!');
+        toast.success('Thêm mới thiết bị thành công!');
       }
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      if (id) queryClient.invalidateQueries({ queryKey: ['asset', Number(id)] });
       navigate('/assets');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi lưu thiết bị');
+      const msg = e.message || 'Lỗi khi lưu thiết bị';
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -213,21 +236,24 @@ export default function AssetForm() {
   if (pageLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-28 space-y-3">
-        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-sm font-semibold text-slate-600">Đang tải thông tin thiết bị...</p>
+        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-medium text-slate-600">Đang tải thông tin thiết bị...</p>
       </div>
     );
   }
 
   if (fetchError) {
     return (
-      <div className="max-w-md mx-auto my-16 p-6 bg-white rounded-2xl border border-red-200 text-center space-y-4 shadow-sm">
-        <div className="text-3xl">⚠️</div>
-        <h3 className="font-bold text-base text-slate-900">Không thể tải thông tin thiết bị</h3>
+      <div className="max-w-md mx-auto my-16 p-6 bg-white rounded-2xl border border-rose-200 text-center space-y-4 shadow-xs">
+        <div className="w-11 h-11 mx-auto rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <h3 className="font-heading font-semibold text-base text-slate-900">Không thể tải thông tin thiết bị</h3>
         <p className="text-xs text-slate-500">{fetchError}</p>
         <button
+          type="button"
           onClick={() => navigate('/assets')}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition"
+          className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-medium cursor-pointer transition"
         >
           Quay lại danh sách thiết bị
         </button>
@@ -239,40 +265,54 @@ export default function AssetForm() {
     <div className="space-y-6 max-w-4xl mx-auto pb-16">
       {/* Top Header */}
       <div className="flex items-center gap-3">
-        <button 
-          onClick={() => navigate(-1)} 
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          aria-label="Quay lại"
           className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 cursor-pointer transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="font-heading text-xl sm:text-2xl font-semibold text-slate-900">
             {isEdit ? 'Chỉnh sửa thông tin thiết bị' : 'Thêm mới thiết bị & Tài sản'}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Phân loại rõ vào 1 trong 3 khối: <strong>Khoa Dược (TBYT)</strong>, <strong>Tổ CNTT</strong> hoặc <strong>Phòng TCHC</strong>
+            Phân loại vào 1 trong 3 khối: <strong className="font-medium text-slate-700">Khoa Dược (TBYT)</strong>,{' '}
+            <strong className="font-medium text-slate-700">Tổ CNTT</strong> hoặc{' '}
+            <strong className="font-medium text-slate-700">Phòng TCHC</strong>
           </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 sm:p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {formError && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2.5 text-xs text-rose-700 font-medium">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
           {/* SECTION 1: PHÂN LOẠI & ĐỊNH DANH */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-slate-900 border-b border-slate-100 pb-2 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">1</span>
+            <h3 className="font-heading text-xs font-semibold text-slate-900 border-b border-slate-100 pb-2 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-blue-700 text-white flex items-center justify-center text-[10px]">1</span>
               Định danh & Phân loại danh mục
             </h3>
-            
+
             {/* Role indicator banner */}
             {!isAdmin && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-semibold text-blue-800">
-                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-medium text-blue-800">
+                <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0" />
                 <span>
-                  {isCntt ? '💻 Quyền hạn Tổ CNTT: Chỉ thêm & quản lý tài sản thuộc danh mục Thiết bị CNTT.' :
-                   isDuoc ? '🩺 Quyền hạn Khoa Dược: Chỉ thêm & quản lý tài sản thuộc danh mục Trang thiết bị Y tế.' :
-                   isTchc ? '🏢 Quyền hạn Phòng TCHC: Chỉ thêm & quản lý tài sản thuộc danh mục Hành chính & Tòa nhà.' :
-                   'Phân quyền theo đơn vị của bạn.'}
+                  {isCntt
+                    ? 'Quyền hạn Tổ CNTT: Chỉ thêm & quản lý tài sản thuộc danh mục Thiết bị CNTT.'
+                    : isDuoc
+                    ? 'Quyền hạn Khoa Dược: Chỉ thêm & quản lý tài sản thuộc danh mục Trang thiết bị Y tế.'
+                    : isTchc
+                    ? 'Quyền hạn Phòng TCHC: Chỉ thêm & quản lý tài sản thuộc danh mục Hành chính & Tòa nhà.'
+                    : 'Phân quyền theo đơn vị của bạn.'}
                 </span>
               </div>
             )}
@@ -312,6 +352,28 @@ export default function AssetForm() {
                 ))}
               </div>
             </div>
+
+            {formData.managingUnit === 'TCHC' && (
+              <div className="bg-amber-50/40 border border-amber-200/70 rounded-xl p-3.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Phân nhóm tài sản TCHC ({formData.buildingAsset === 1 ? 'Cơ điện & Hạ tầng M&E' : 'Trang bị Hành chính'})
+                </label>
+                <select
+                  value={formData.assetGroup}
+                  onChange={e => setFormData({ ...formData, assetGroup: e.target.value })}
+                  className="w-full md:w-1/2 border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 bg-white font-medium text-slate-800"
+                >
+                  <option value="">-- Chọn phân nhóm chuyên môn --</option>
+                  {TCHC_GROUP_OPTIONS.filter(
+                    g => g.scope === (formData.buildingAsset === 1 ? 'ME' : 'HC')
+                  ).map(g => (
+                    <option key={g.value} value={g.value}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div>
@@ -423,6 +485,7 @@ export default function AssetForm() {
                     onChange={e => setFormData({ ...formData, floor: e.target.value })}
                     className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-orange-800"
                   >
+                    <option value="">-- Không theo tầng / Dùng chung --</option>
                     {FLOORS.map(fl => (
                       <option key={fl} value={fl}>{fl}</option>
                     ))}
@@ -545,18 +608,18 @@ export default function AssetForm() {
             </div>
           </div>
           
-          <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-            <button 
-              type="button" 
-              onClick={() => navigate(-1)} 
-              className="px-5 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+          <div className="sticky bottom-3 z-20 flex justify-end gap-3 px-5 py-3.5 bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-2xl shadow-md">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="px-5 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
               Hủy bỏ
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 shadow flex items-center gap-2 transition cursor-pointer disabled:opacity-70"
+              className="px-6 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-70"
             >
               <Save className="w-4 h-4" /> {loading ? 'Đang lưu...' : 'Lưu thông tin thiết bị'}
             </button>

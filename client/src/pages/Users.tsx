@@ -1,23 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users as UsersIcon, Plus, Search, KeyRound, Edit2, Trash2, 
   ShieldCheck, Building2, Lock, CheckCircle2, AlertTriangle, 
-  Monitor, Stethoscope, Layers, RefreshCw, X, Eye, EyeOff
+  Monitor, Stethoscope, Layers, RefreshCw, X, Eye, EyeOff,
+  ArrowUpDown, ArrowUp, ArrowDown, ExternalLink
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../lib/api';
 import { User, Department } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
+import DataTableShell, { useTablePrefs } from '../components/ui/DataTableShell';
+import RowActionMenu from '../components/ui/RowActionMenu';
 
 export default function Users() {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Filters & Sorting
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState<'username' | 'fullName' | 'role' | 'dept'>('role');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Modals state
   const [showUserModal, setShowUserModal] = useState(false);
@@ -34,6 +45,7 @@ export default function Users() {
   });
 
   // Reset Password State
+  const { density, setDensity, cellPy, headPy } = useTablePrefs('users');
   const [resetPassData, setResetPassData] = useState({
     newPassword: '',
     confirmPassword: ''
@@ -102,7 +114,7 @@ export default function Users() {
   const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName || !formData.role) {
-      alert('Vui lòng điền đầy đủ họ tên và phân quyền!');
+      toast.warning('Vui lòng điền đầy đủ họ tên và phân quyền!');
       return;
     }
 
@@ -115,11 +127,11 @@ export default function Users() {
           departmentId: formData.departmentId ? parseInt(formData.departmentId) : null,
           username: formData.username
         });
-        alert(`Đã cập nhật thông tin tài khoản ${formData.username} thành công!`);
+        toast.success(`Đã cập nhật thông tin tài khoản ${formData.username} thành công!`);
       } else {
         // Create User
         if (!formData.username || !formData.password) {
-          alert('Vui lòng nhập tên đăng nhập và mật khẩu khởi tạo!');
+          toast.warning('Vui lòng nhập tên đăng nhập và mật khẩu khởi tạo!');
           return;
         }
         await apiPost('/users', {
@@ -129,13 +141,13 @@ export default function Users() {
           role: formData.role,
           departmentId: formData.departmentId ? parseInt(formData.departmentId) : null
         });
-        alert(`Đã tạo tài khoản ${formData.username} thành công!`);
+        toast.success(`Đã tạo tài khoản ${formData.username} thành công!`);
       }
 
       setShowUserModal(false);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi lưu thông tin người dùng');
+      toast.error(err.message || 'Lỗi khi lưu thông tin người dùng');
     }
   };
 
@@ -145,12 +157,12 @@ export default function Users() {
     if (!selectedUser) return;
 
     if (resetPassData.newPassword.length < 6) {
-      alert('Mật khẩu mới phải có tối thiểu 6 ký tự!');
+      toast.warning('Mật khẩu mới phải có tối thiểu 6 ký tự!');
       return;
     }
 
     if (resetPassData.newPassword !== resetPassData.confirmPassword) {
-      alert('Xác nhận mật khẩu mới không trùng khớp!');
+      toast.warning('Xác nhận mật khẩu mới không trùng khớp!');
       return;
     }
 
@@ -158,50 +170,119 @@ export default function Users() {
       await apiPut(`/users/${selectedUser.id}/reset-password`, {
         newPassword: resetPassData.newPassword
       });
-      alert(`Đã đặt lại mật khẩu cho tài khoản ${selectedUser.username} thành công!`);
+      toast.success(`Đã đặt lại mật khẩu cho tài khoản ${selectedUser.username} thành công!`);
       setShowResetModal(false);
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi đặt lại mật khẩu');
+      toast.error(err.message || 'Lỗi khi đặt lại mật khẩu');
     }
   };
 
   // Delete User
   const handleDeleteUser = async (user: User) => {
     if (user.id === currentUser?.id) {
-      alert('Bạn không thể tự xóa tài khoản của chính mình!');
+      toast.warning('Bạn không thể tự xóa tài khoản của chính mình!');
       return;
     }
 
     if (user.username === 'admin') {
-      alert('Không được phép xóa tài khoản Quản trị viên tối cao (admin)!');
+      toast.warning('Không được phép xóa tài khoản Admin hệ thống!');
       return;
     }
 
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${user.username}" (${user.fullName}) khỏi hệ thống?`)) {
+    const ok = await confirm({
+      title: 'Xóa tài khoản người dùng',
+      message: `Bạn có chắc chắn muốn xóa tài khoản "${user.username}" (${user.fullName}) khỏi hệ thống?`,
+      confirmLabel: 'Xóa tài khoản',
+      variant: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
     try {
       await apiDelete(`/users/${user.id}`);
-      alert(`Đã xóa tài khoản ${user.username} thành công!`);
+      toast.success(`Đã xóa tài khoản ${user.username} thành công!`);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi xóa người dùng');
+      toast.error(err.message || 'Lỗi khi xóa người dùng');
     }
   };
 
-  // Filter users
-  const filteredUsers = users.filter(u => {
-    const searchMatch = !search ||
-      u.username.toLowerCase().includes(search.toLowerCase()) ||
-      u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      u.department?.name?.toLowerCase().includes(search.toLowerCase());
+  // Filter & Sort users
+  const filteredUsers = useMemo(() => {
+    const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const roleRank: Record<string, number> = {
+      ADMIN: 1,
+      MANAGER_DUOC: 2,
+      MANAGER_CNTT: 3,
+      MANAGER_TCHC: 4,
+      DEPARTMENT: 5,
+      VIEWER: 6,
+    };
+    const collator = new Intl.Collator('vi', { numeric: true, sensitivity: 'base' });
 
-    const roleMatch = roleFilter === 'ALL' || u.role === roleFilter;
-    const deptMatch = deptFilter === 'ALL' || u.departmentId?.toString() === deptFilter;
+    const list = users.filter((u) => {
+      if (roleFilter !== 'ALL' && u.role !== roleFilter) return false;
+      if (deptFilter !== 'ALL' && u.departmentId?.toString() !== deptFilter) return false;
+      if (tokens.length === 0) return true;
+      const blob = [
+        u.username,
+        u.fullName,
+        u.role,
+        u.department?.code,
+        u.department?.name,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return tokens.every((tok) => blob.includes(tok));
+    });
 
-    return searchMatch && roleMatch && deptMatch;
-  });
+    const dir = sortOrder === 'desc' ? -1 : 1;
+    return list.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'username') cmp = collator.compare(a.username, b.username);
+      else if (sortBy === 'fullName') cmp = collator.compare(a.fullName, b.fullName);
+      else if (sortBy === 'dept') {
+        cmp = collator.compare(a.department?.name || 'AAA', b.department?.name || 'AAA');
+      } else {
+        cmp = (roleRank[a.role] || 9) - (roleRank[b.role] || 9);
+      }
+      if (cmp !== 0) return cmp * dir;
+      return collator.compare(a.username, b.username);
+    });
+  }, [users, search, roleFilter, deptFilter, sortBy, sortOrder]);
+
+  const handleSort = (field: 'username' | 'fullName' | 'role' | 'dept') => {
+    if (sortBy === field) setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const renderSortIcon = (field: 'username' | 'fullName' | 'role' | 'dept') => {
+    if (sortBy !== field) return <ArrowUpDown className="w-3.5 h-3.5 text-slate-300" />;
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="w-3.5 h-3.5 text-blue-700" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-blue-700" />
+    );
+  };
+
+  const getUserAssetsScopeUrl = (u: User): { url: string; label: string } => {
+    if (u.role === 'ADMIN' || u.role === 'VIEWER') return { url: '/assets', label: 'Toàn bộ danh mục TS' };
+    if (u.role === 'MANAGER_DUOC') return { url: '/assets?managingUnit=DUOC', label: 'Khối TBYT (Dược)' };
+    if (u.role === 'MANAGER_CNTT') return { url: '/assets?managingUnit=CNTT', label: 'Khối CNTT (IT)' };
+    if (u.role === 'MANAGER_TCHC') return { url: '/assets?managingUnit=TCHC', label: 'Khối TCHC (HC & M&E)' };
+    if (u.departmentId) {
+      return {
+        url: `/assets?departmentId=${u.departmentId}`,
+        label: `TS ${u.department?.code || 'Khoa/Phòng'}`,
+      };
+    }
+    return { url: '/assets', label: 'Danh mục TS' };
+  };
 
   // Calculate statistics
   const totalUsers = users.length;
@@ -212,7 +293,7 @@ export default function Users() {
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'ADMIN':
-        return <span className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-full font-bold text-[11px] flex items-center gap-1 w-fit"><ShieldCheck className="w-3.5 h-3.5" /> Quản Trị Tối Cao</span>;
+        return <span className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-full font-bold text-[11px] flex items-center gap-1 w-fit"><ShieldCheck className="w-3.5 h-3.5" /> Admin</span>;
       case 'MANAGER_DUOC':
         return <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[11px] flex items-center gap-1 w-fit"><Stethoscope className="w-3.5 h-3.5" /> Quản Lý Dược (TBYT)</span>;
       case 'MANAGER_CNTT':
@@ -220,8 +301,11 @@ export default function Users() {
       case 'MANAGER_TCHC':
         return <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full font-bold text-[11px] flex items-center gap-1 w-fit"><Building2 className="w-3.5 h-3.5" /> Quản Lý Phòng TCHC</span>;
       case 'DEPARTMENT':
-      default:
         return <span className="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-bold text-[11px] flex items-center gap-1 w-fit"><Layers className="w-3.5 h-3.5" /> Khoa / Phòng</span>;
+      case 'VIEWER':
+        return <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full font-bold text-[11px] flex items-center gap-1 w-fit"><Eye className="w-3.5 h-3.5" /> Chỉ Xem (BGĐ/KT)</span>;
+      default:
+        return <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-full font-bold text-[11px] flex items-center gap-1 w-fit"><Layers className="w-3.5 h-3.5" /> {role}</span>;
     }
   };
 
@@ -280,9 +364,9 @@ export default function Users() {
       </div>
 
       {/* 3. TABLE & FILTER CONTAINER */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="space-y-3">
         {/* Filters Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+        <div className="p-4 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={roleFilter}
@@ -290,11 +374,12 @@ export default function Users() {
               className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="ALL">-- Vai trò / Quyền hạn (Tất cả) --</option>
-              <option value="ADMIN">Quản Trị Viên Tối Cao (Admin)</option>
+              <option value="ADMIN">Admin</option>
               <option value="MANAGER_DUOC">Quản Lý TBYT - Khoa Dược</option>
               <option value="MANAGER_CNTT">Quản Lý Thiết Bị - Tổ CNTT</option>
               <option value="MANAGER_TCHC">Quản Lý CSVC - Phòng TCHC</option>
               <option value="DEPARTMENT">Người Dùng Khoa / Phòng</option>
+              <option value="VIEWER">Chỉ Xem Toàn Viện (BGĐ / Kế toán)</option>
             </select>
 
             <select
@@ -322,76 +407,211 @@ export default function Users() {
         </div>
 
         {/* User Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 font-bold uppercase border-b border-slate-200">
-              <tr>
-                <th className="p-3.5 w-12 text-center">STT</th>
-                <th className="p-3.5 min-w-[140px]">Tên đăng nhập</th>
-                <th className="p-3.5 min-w-[200px]">Họ và tên</th>
-                <th className="p-3.5 min-w-[190px]">Phân quyền / Vai trò</th>
-                <th className="p-3.5 min-w-[200px]">Khoa / Phòng liên kết</th>
-                <th className="p-3.5 text-center min-w-[160px]">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredUsers.length === 0 ? (
+        <DataTableShell
+          title="Danh sách tài khoản người dùng"
+          totalCount={filteredUsers.length}
+          countLabel="tài khoản"
+          density={density}
+          onDensityChange={setDensity}
+          loading={loading}
+          isEmpty={filteredUsers.length === 0}
+          emptyMessage="Không tìm thấy tài khoản người dùng nào phù hợp."
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
-                    Không tìm thấy tài khoản người dùng nào phù hợp.
-                  </td>
+                  <th className={`${headPy} px-4 min-w-[220px] whitespace-nowrap`}>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSort('fullName')}
+                        className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                      >
+                        <span>Họ tên</span>
+                        {renderSortIcon('fullName')}
+                      </button>
+                      <span className="text-slate-300">·</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSort('username')}
+                        className="inline-flex items-center gap-1 hover:text-blue-700 cursor-pointer"
+                      >
+                        <span>Username</span>
+                        {renderSortIcon('username')}
+                      </button>
+                    </div>
+                  </th>
+                  <th className={`${headPy} px-4 whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('role')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                    >
+                      <span>Phân quyền / Vai trò</span>
+                      {renderSortIcon('role')}
+                    </button>
+                  </th>
+                  <th className={`${headPy} px-4 min-w-[180px] whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('dept')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                    >
+                      <span>Khoa / Phòng &amp; Phạm vi TS</span>
+                      {renderSortIcon('dept')}
+                    </button>
+                  </th>
+                  <th className={`${headPy} px-4 w-28 text-right whitespace-nowrap`}>Thao tác</th>
                 </tr>
-              ) : (
-                filteredUsers.map((u, idx) => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-3.5 text-center font-bold text-slate-500">{idx + 1}</td>
-                    <td className="p-3.5">
-                      <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
-                        {u.username}
-                      </span>
-                    </td>
-                    <td className="p-3.5">
-                      <div className="font-bold text-slate-900 text-sm">{u.fullName}</div>
-                    </td>
-                    <td className="p-3.5">
-                      {getRoleBadge(u.role)}
-                    </td>
-                    <td className="p-3.5 font-medium text-slate-700">
-                      {u.department ? `${u.department.code} - ${u.department.name}` : (
-                        <span className="text-slate-400 italic">Toàn cơ quan</span>
-                      )}
-                    </td>
-                    <td className="p-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {!loading &&
+                  filteredUsers.map((u) => {
+                    const scopeInfo = getUserAssetsScopeUrl(u);
+                    return (
+                    <tr key={u.id} className="hover:bg-slate-50/75 transition-colors">
+                      <td className={`${cellPy} px-4 align-top`}>
+                        <div className="font-heading font-semibold text-slate-800 text-sm leading-snug">
+                          {u.fullName}
+                        </div>
+                        <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 font-mono text-[11px] font-medium text-blue-700">
+                          @{u.username}
+                        </span>
+                      </td>
+                      <td className={`${cellPy} px-4 align-top whitespace-nowrap`}>
+                        {getRoleBadge(u.role)}
+                      </td>
+                      <td className={`${cellPy} px-4 align-top font-medium text-slate-700`}>
+                        <div>
+                          {u.department ? (
+                            `${u.department.code} - ${u.department.name}`
+                          ) : (
+                            <span className="text-slate-500">Toàn cơ quan CDC Đà Nẵng</span>
+                          )}
+                        </div>
                         <button
-                          onClick={() => handleOpenReset(u)}
-                          title="Đặt lại mật khẩu (Reset pass)"
-                          className="p-1.5 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition cursor-pointer"
+                          type="button"
+                          onClick={() => navigate(scopeInfo.url)}
+                          className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200/80 hover:border-blue-200 text-[11px] font-medium transition cursor-pointer"
                         >
-                          <KeyRound className="w-4 h-4" />
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Xem {scopeInfo.label}</span>
                         </button>
-                        <button
-                          onClick={() => handleOpenEdit(u)}
-                          title="Chỉnh sửa thông tin & phân quyền"
-                          className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(u)}
-                          disabled={u.id === currentUser?.id || u.username === 'admin'}
-                          title={u.username === 'admin' ? 'Không thể xóa Quản trị viên tối cao' : 'Xóa tài khoản'}
-                          className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-40 disabled:hover:bg-red-50 rounded-lg transition cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      </td>
+                      <td className={`${cellPy} px-4 align-top text-right whitespace-nowrap`}>
+                        <RowActionMenu
+                          primary={{
+                            label: 'Sửa',
+                            title: 'Chỉnh sửa thông tin & phân quyền',
+                            icon: <Edit2 className="w-3.5 h-3.5" />,
+                            onClick: () => handleOpenEdit(u),
+                            tone: 'blue',
+                          }}
+                          items={[
+                            {
+                              label: `Mở danh mục (${scopeInfo.label})`,
+                              icon: <ExternalLink className="w-3.5 h-3.5" />,
+                              onClick: () => navigate(scopeInfo.url),
+                            },
+                            {
+                              label: 'Đặt lại mật khẩu',
+                              icon: <KeyRound className="w-3.5 h-3.5" />,
+                              onClick: () => handleOpenReset(u),
+                            },
+                            {
+                              label: 'Xóa tài khoản',
+                              icon: <Trash2 className="w-3.5 h-3.5" />,
+                              onClick: () => handleDeleteUser(u),
+                              danger: true,
+                              hidden: u.id === currentUser?.id || u.username === 'admin',
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </DataTableShell>
+
+        {/* RBAC Security & Role Matrix Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-heading text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-emerald-600" />
+                <span>Ma trận Phân quyền &amp; Bảo mật JWT chuẩn Production</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Xác thực bắt buộc qua JWT Bearer Token (bcrypt mật khẩu thật, tự động chặn 401/403 nếu thiếu token hoặc thao tác vượt phạm vi).
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Đã khóa bảo mật API
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-y border-slate-200 text-slate-600 font-semibold">
+                  <th className="py-2 px-3">Vai trò</th>
+                  <th className="py-2 px-3">Phạm vi dữ liệu</th>
+                  <th className="py-2 px-3">Quản lý Tài sản / Khấu hao</th>
+                  <th className="py-2 px-3">Báo hỏng / Kiểm kê</th>
+                  <th className="py-2 px-3">Duyệt Thanh lý / Điều chuyển / Quản trị</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tr>
+                  <td className="py-2 px-3 font-bold text-rose-700">ADMIN</td>
+                  <td className="py-2 px-3">Toàn viện CDC</td>
+                  <td className="py-2 px-3">Toàn quyền Thêm / Sửa / Xóa</td>
+                  <td className="py-2 px-3">Xử lý, kiểm kê, in tem QR toàn viện</td>
+                  <td className="py-2 px-3">Duyệt hồ sơ + Quản trị User, Khoa, Telegram</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-emerald-700">MANAGER_DUOC</td>
+                  <td className="py-2 px-3">Khối Dược (TBYT)</td>
+                  <td className="py-2 px-3">Quản lý TBYT + Hiệu chuẩn + BTKH</td>
+                  <td className="py-2 px-3">Tiếp nhận sửa, kiểm kê khối Dược</td>
+                  <td className="py-2 px-3">Giám định kỹ thuật thanh lý khối Dược</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-blue-700">MANAGER_CNTT</td>
+                  <td className="py-2 px-3">Khối CNTT (IT)</td>
+                  <td className="py-2 px-3">Quản lý thiết bị CNTT &amp; đồng bộ IT</td>
+                  <td className="py-2 px-3">Tiếp nhận sửa, kiểm kê khối CNTT</td>
+                  <td className="py-2 px-3">Giám định kỹ thuật thanh lý khối CNTT</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-amber-700">MANAGER_TCHC</td>
+                  <td className="py-2 px-3">Khối TCHC (HC &amp; M&amp;E)</td>
+                  <td className="py-2 px-3">Quản lý nội thất, xe &amp; hạ tầng</td>
+                  <td className="py-2 px-3">Tiếp nhận sửa, kiểm kê khối TCHC</td>
+                  <td className="py-2 px-3">Giám định kỹ thuật thanh lý khối TCHC</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-purple-700">DEPARTMENT</td>
+                  <td className="py-2 px-3">Đúng Khoa/Phòng được gán</td>
+                  <td className="py-2 px-3">Chỉ xem (không thêm/sửa/xóa TS)</td>
+                  <td className="py-2 px-3">Gửi báo hỏng, kiểm kê tại khoa, in tem</td>
+                  <td className="py-2 px-3">Gửi đề xuất điều chuyển / thanh lý khoa mình</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-bold text-indigo-700">VIEWER</td>
+                  <td className="py-2 px-3">Toàn viện CDC</td>
+                  <td className="py-2 px-3">Chỉ xem toàn viện, xuất Excel/In A4</td>
+                  <td className="py-2 px-3">Chỉ xem báo cáo &amp; tra cứu QR</td>
+                  <td className="py-2 px-3">Không có quyền thêm / sửa / xóa / duyệt</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -468,8 +688,9 @@ export default function Users() {
                   <option value="DEPARTMENT">🏢 Người Dùng Khoa / Phòng (Xem tài sản khoa, báo hỏng, kiểm kê, đề xuất thanh lý)</option>
                   <option value="MANAGER_CNTT">💻 Quản Lý Tài Sản - Tổ CNTT (Chuyên trách quản lý 713 thiết bị CNTT)</option>
                   <option value="MANAGER_DUOC">🩺 Quản Lý Tài Sản - Khoa Dược (Chuyên trách quản lý 1.497 TBYT & Hiệu chuẩn)</option>
-                  <option value="MANAGER_TCHC">🏢 Quản Lý Tài Sản - Phòng TCHC (Chuyên trách CSVC & Thiết bị Hành chính)</option>
-                  <option value="ADMIN">👑 Quản Trị Viên Tối Cao (Ban Giám Đốc - Toàn quyền hệ thống)</option>
+                  <option value="MANAGER_TCHC">🏢 Quản Lý Tài Sản - Phòng TCHC (Chuyên trách CSVC &amp; Thiết bị Hành chính)</option>
+                  <option value="VIEWER">👁️ Chỉ Xem Toàn Viện (Lãnh đạo / Kế toán / Kiểm tra — Không được sửa xóa)</option>
+                  <option value="ADMIN">👑 Admin (Toàn quyền hệ thống)</option>
                 </select>
               </div>
 

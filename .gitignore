@@ -44,3 +44,7 @@ Thumbs.db
 .tempmediaStorage/
 scratch/
 ~$*
+
+# Local PostgreSQL data & uploaded runtime files
+.pgdata/
+server/uploads/

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import ExcelJS from 'exceljs';
+import { buildSmartAssetSearch, sortAssetsMultiLevel } from './assets';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -23,31 +24,74 @@ const DOUBLE_BOTTOM_BORDER: Partial<ExcelJS.Borders> = {
 // 1. Xuất danh sách tài sản (Có định dạng chuẩn, kẻ bảng, kẻ ô)
 router.get('/assets', requireAuth, async (req: any, res) => {
   try {
-    const { departmentId, managingUnit, status } = req.query;
-    const where: any = {};
+    const {
+      departmentId,
+      managingUnit,
+      status,
+      buildingAsset,
+      floor,
+      assetGroup,
+      search,
+      categoryId,
+      location,
+      sortBy = 'assetCode',
+      sortOrder = 'asc',
+      sortBy2 = '',
+      sortOrder2 = 'asc',
+    } = req.query;
+    const andFilters: any[] = [];
 
-    if (departmentId) {
-      where.departmentId = parseInt(departmentId as string);
-    } else if (req.user.role === 'DEPARTMENT' && req.user.departmentId) {
-      where.departmentId = req.user.departmentId;
+    if (req.user?.role === 'DEPARTMENT' && req.user.departmentId) {
+      andFilters.push({ departmentId: req.user.departmentId });
+    } else if (departmentId) {
+      andFilters.push({ departmentId: parseInt(departmentId as string) });
     }
 
-    if (managingUnit) where.managingUnit = managingUnit;
-    if (status) where.status = status;
+    if (managingUnit) andFilters.push({ managingUnit });
+    if (categoryId) andFilters.push({ categoryId: parseInt(categoryId as string) });
+    if (location && typeof location === 'string' && location.trim()) {
+      andFilters.push({ location: location.trim() });
+    }
+    if (buildingAsset !== undefined && buildingAsset !== '') {
+      andFilters.push({ buildingAsset: parseInt(buildingAsset as string) || 0 });
+    }
+    if (floor && floor !== 'Tất cả tầng') {
+      if (floor === 'NONE' || floor === 'Chưa gắn tầng') {
+        andFilters.push({ OR: [{ floor: null }, { floor: '' }] });
+      } else {
+        andFilters.push({ floor });
+      }
+    }
+    if (assetGroup && typeof assetGroup === 'string' && assetGroup.trim()) {
+      const gParts = assetGroup.split(',').map((s) => s.trim()).filter(Boolean);
+      andFilters.push({ assetGroup: gParts.length > 1 ? { in: gParts } : gParts[0] });
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      andFilters.push(...buildSmartAssetSearch(search));
+    }
+    if (status && typeof status === 'string' && status.trim()) {
+      const parts = status.split(',').map((s) => s.trim()).filter(Boolean);
+      andFilters.push({ status: parts.length > 1 ? { in: parts } : parts[0] });
+    }
 
     if (req.user) {
-      if (req.user.role === 'MANAGER_CNTT') where.managingUnit = 'CNTT';
-      else if (req.user.role === 'MANAGER_DUOC') where.managingUnit = 'DUOC';
-      else if (req.user.role === 'MANAGER_TCHC') where.managingUnit = 'TCHC';
+      if (req.user.role === 'MANAGER_CNTT') andFilters.push({ managingUnit: 'CNTT' });
+      else if (req.user.role === 'MANAGER_DUOC') andFilters.push({ managingUnit: 'DUOC' });
+      else if (req.user.role === 'MANAGER_TCHC') andFilters.push({ managingUnit: 'TCHC' });
     }
 
-    const assets = await prisma.asset.findMany({
+    const where = andFilters.length > 0 ? { AND: andFilters } : {};
+    const rawAssets = await prisma.asset.findMany({
       where,
       include: { category: true, department: true },
-      orderBy: [
-        { assetCode: 'asc' }
-      ]
     });
+    const assets = sortAssetsMultiLevel(
+      rawAssets,
+      String(sortBy || 'assetCode'),
+      (sortOrder as string)?.toLowerCase() === 'desc' ? 'desc' : 'asc',
+      String(sortBy2 || ''),
+      (sortOrder2 as string)?.toLowerCase() === 'desc' ? 'desc' : 'asc'
+    );
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Danh Sách Tài Sản', {
@@ -211,80 +255,68 @@ function toColLetter(colIdx: number): string {
 router.get('/c53-hd', requireAuth, async (req: any, res) => {
   try {
     const { 
-      departmentId, managingUnit, buildingAsset, floor, inventoryDate, signaturesJson, visibleColumns,
-      sortBy = 'assetCode', sortOrder = 'asc' 
+      departmentId, managingUnit, buildingAsset, floor, assetGroup, search, inventoryDate, signaturesJson, visibleColumns,
+      sortBy = 'assetCode', sortOrder = 'asc', sortBy2 = '', sortOrder2 = 'asc'
     } = req.query;
-    const where: any = {};
+    const andFilters: any[] = [];
 
-    if (departmentId) {
-      where.departmentId = parseInt(departmentId as string);
-    } else if (req.user.role === 'DEPARTMENT' && req.user.departmentId) {
-      where.departmentId = req.user.departmentId;
+    if (req.user?.role === 'DEPARTMENT' && req.user.departmentId) {
+      andFilters.push({ departmentId: req.user.departmentId });
+    } else if (departmentId) {
+      andFilters.push({ departmentId: parseInt(departmentId as string) });
     }
 
-    if (managingUnit) where.managingUnit = managingUnit;
+    if (managingUnit) andFilters.push({ managingUnit });
     if (buildingAsset !== undefined && buildingAsset !== '') {
-      where.buildingAsset = parseInt(buildingAsset as string);
+      andFilters.push({ buildingAsset: parseInt(buildingAsset as string) });
     }
-    if (floor && floor !== 'Tất cả tầng') where.floor = floor;
+    if (floor && floor !== 'Tất cả tầng') {
+      if (floor === 'NONE' || floor === 'Chưa gắn tầng') {
+        andFilters.push({ OR: [{ floor: null }, { floor: '' }] });
+      } else {
+        andFilters.push({ floor });
+      }
+    }
+    if (assetGroup && typeof assetGroup === 'string' && assetGroup.trim()) {
+      const parts = assetGroup.split(',').map((s) => s.trim()).filter(Boolean);
+      andFilters.push({ assetGroup: parts.length > 1 ? { in: parts } : parts[0] });
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      andFilters.push(...buildSmartAssetSearch(search));
+    }
 
     if (req.user) {
-      if (req.user.role === 'MANAGER_CNTT') where.managingUnit = 'CNTT';
-      else if (req.user.role === 'MANAGER_DUOC') where.managingUnit = 'DUOC';
-      else if (req.user.role === 'MANAGER_TCHC') where.managingUnit = 'TCHC';
+      if (req.user.role === 'MANAGER_CNTT') andFilters.push({ managingUnit: 'CNTT' });
+      else if (req.user.role === 'MANAGER_DUOC') andFilters.push({ managingUnit: 'DUOC' });
+      else if (req.user.role === 'MANAGER_TCHC') andFilters.push({ managingUnit: 'TCHC' });
     }
 
-    const dept = departmentId 
-      ? await prisma.department.findUnique({ where: { id: parseInt(departmentId as string) } })
+    const targetDeptId =
+      req.user?.role === 'DEPARTMENT' && req.user.departmentId
+        ? req.user.departmentId
+        : departmentId
+        ? parseInt(departmentId as string)
+        : null;
+    const dept = targetDeptId
+      ? await prisma.department.findUnique({ where: { id: targetDeptId } })
       : null;
 
     const validSortOrder = (sortOrder as string)?.toLowerCase() === 'desc' ? 'desc' : 'asc';
-    let orderBy: any[] = [];
+    const validSortOrder2 = (sortOrder2 as string)?.toLowerCase() === 'desc' ? 'desc' : 'asc';
+    const where = andFilters.length > 0 ? { AND: andFilters } : {};
 
-    if (sortBy === 'name') {
-      orderBy = [{ name: validSortOrder }, { assetCode: 'asc' }];
-    } else if (sortBy === 'department' || sortBy === 'user') {
-      orderBy = [{ department: { name: validSortOrder } }, { assetCode: 'asc' }];
-    } else if (sortBy === 'yearInUse') {
-      orderBy = [{ yearInUse: validSortOrder }, { assetCode: 'asc' }];
-    } else if (sortBy === 'status') {
-      orderBy = [{ status: validSortOrder }, { assetCode: 'asc' }];
-    } else if (sortBy === 'price' || sortBy === 'originalPrice') {
-      orderBy = [{ originalPrice: validSortOrder }, { assetCode: 'asc' }];
-    } else if (sortBy === 'oldAssetCode') {
-      orderBy = [{ oldAssetCode: validSortOrder }, { assetCode: 'asc' }];
-    } else {
-      orderBy = [{ assetCode: validSortOrder }];
-    }
-
-    const assets = await prisma.asset.findMany({
+    const rawAssets = await prisma.asset.findMany({
       where,
       include: { category: true, department: true },
-      orderBy
     });
 
-    // Natural sort in memory to ensure numeric order like VT/PKDK-001, VT/PKDK-002, VT/PKDK-010
-    assets.sort((a, b) => {
-      let cmp = 0;
-      if (sortBy === 'assetCode') {
-        cmp = (a.assetCode || '').localeCompare(b.assetCode || '', undefined, { numeric: true, sensitivity: 'base' });
-      } else if (sortBy === 'oldAssetCode') {
-        cmp = (a.oldAssetCode || '').localeCompare(b.oldAssetCode || '', undefined, { numeric: true, sensitivity: 'base' });
-      } else if (sortBy === 'name') {
-        cmp = (a.name || '').localeCompare(b.name || '', 'vi', { sensitivity: 'base' });
-      } else if (sortBy === 'yearInUse') {
-        cmp = String(a.yearInUse || '').localeCompare(String(b.yearInUse || ''), undefined, { numeric: true });
-      } else if (sortBy === 'price' || sortBy === 'originalPrice') {
-        cmp = (a.originalPrice || 0) - (b.originalPrice || 0);
-      } else if (sortBy === 'status') {
-        cmp = (a.status || '').localeCompare(b.status || '', 'vi');
-      } else if (sortBy === 'department' || sortBy === 'user') {
-        const locA = a.locationDetail || a.assignedTo || a.department?.name || '';
-        const locB = b.locationDetail || b.assignedTo || b.department?.name || '';
-        cmp = locA.localeCompare(locB, 'vi');
-      }
-      return validSortOrder === 'asc' ? cmp : -cmp;
-    });
+    const assets = sortAssetsMultiLevel(
+      rawAssets,
+      String(sortBy === 'user' ? 'assignedTo' : sortBy || 'assetCode'),
+      validSortOrder,
+      String(sortBy2 || ''),
+      validSortOrder2
+    );
 
     // Custom signatures if passed from client
     let sigs: any = {};
@@ -766,10 +798,10 @@ router.get('/maintenance', requireAuth, async (req: any, res) => {
     const { departmentId, managingUnit, status, priority, sortBy = 'date', sortOrder = 'desc' } = req.query;
     const where: any = {};
 
-    if (departmentId && departmentId !== 'ALL') {
-      where.departmentId = parseInt(departmentId as string);
-    } else if (req.user.role === 'DEPARTMENT' && req.user.departmentId) {
+    if (req.user?.role === 'DEPARTMENT' && req.user.departmentId) {
       where.departmentId = req.user.departmentId;
+    } else if (departmentId && departmentId !== 'ALL') {
+      where.departmentId = parseInt(departmentId as string);
     }
 
     if (status && status !== 'ALL') where.status = status;
@@ -992,12 +1024,20 @@ router.get('/maintenance', requireAuth, async (req: any, res) => {
 
 // 4. Xuất danh sách Hiệu chuẩn, Thử nghiệm, Kiểm định TBYT (Excel chuẩn CDC Đà Nẵng có sắp xếp theo chỉ định)
 router.get('/calibrations', requireAuth, async (req: any, res) => {
+  if (req.user?.role === 'MANAGER_CNTT' || req.user?.role === 'MANAGER_TCHC') {
+    return res.status(403).json({ error: 'Bạn không có quyền xuất dữ liệu Hiệu chuẩn TBYT.' });
+  }
   try {
     const { serviceType, result, location, sortBy = 'date', sortOrder = 'asc' } = req.query;
     const where: any = {};
 
     if (result && result !== 'ALL') where.result = result;
     if (serviceType && serviceType !== 'ALL') where.serviceType = serviceType;
+    if (req.user?.role === 'DEPARTMENT' && req.user.departmentId) {
+      where.asset = { departmentId: req.user.departmentId };
+    } else if (req.user?.role === 'MANAGER_DUOC') {
+      where.asset = { OR: [{ managingUnit: 'DUOC' }, { categoryId: 1 }] };
+    }
 
     let records = await prisma.calibrationRecord.findMany({
       where,

@@ -4,14 +4,30 @@ import {
   Search, Printer, DollarSign, FileText, CheckCircle, XCircle, Users,
   Layers, ShieldCheck, Sparkles, Download, Edit3, Trash2, CalendarCheck,
   Building2, UserCheck, Wrench, RefreshCw, X, ChevronRight, Check, Eye,
-  CheckSquare, Square
+  CheckSquare, Square, MapPin, User
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Asset, PlannedMaintenance as PlannedMaintenanceType, Department } from '../types';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
+import DataTableShell, { useTablePrefs } from '../components/ui/DataTableShell';
+import RowActionMenu from '../components/ui/RowActionMenu';
+import AssetPickerTable from '../components/ui/AssetPickerTable';
 
 export default function PlannedMaintenance() {
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const {
+    density,
+    setDensity,
+    hiddenCols,
+    toggleCol,
+    isColVisible,
+    cellPy,
+    headPy,
+  } = useTablePrefs('planned_maintenance');
   const [records, setRecords] = useState<PlannedMaintenanceType[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -91,7 +107,7 @@ export default function PlannedMaintenance() {
     try {
       const [rRes, aRes, dRes, sRes] = await Promise.allSettled([
         apiGet('/planned-maintenance'),
-        apiGet('/assets?limit=5000'),
+        apiGet('/assets?limit=10000'),
         apiGet('/departments'),
         apiGet('/planned-maintenance/stats/summary')
       ]);
@@ -178,7 +194,7 @@ export default function PlannedMaintenance() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedAssetIds.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 thiết bị từ danh mục TBYT của khoa để lập kế hoạch bảo trì!');
+      toast.warning('Vui lòng chọn ít nhất 1 thiết bị từ danh mục TBYT của khoa để lập kế hoạch bảo trì!');
       return;
     }
     try {
@@ -188,9 +204,9 @@ export default function PlannedMaintenance() {
       });
       setShowModal(false);
       fetchData();
-      alert(`Đã lập kế hoạch bảo trì định kỳ cho ${selectedAssetIds.length} thiết bị thành công!`);
+      toast.success(`Đã lập kế hoạch bảo trì định kỳ cho ${selectedAssetIds.length} thiết bị thành công!`);
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi tạo hồ sơ bảo trì');
+      toast.error(e.message || 'Lỗi khi tạo hồ sơ bảo trì');
     }
   };
 
@@ -271,9 +287,9 @@ export default function PlannedMaintenance() {
       await apiPut(`/planned-maintenance/${editData.id}`, editData);
       setShowEditModal(false);
       fetchData();
-      alert('Đã cập nhật kế hoạch bảo trì thành công!');
+      toast.success('Đã cập nhật kế hoạch bảo trì thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi cập nhật kế hoạch bảo trì');
+      toast.error(e.message || 'Lỗi khi cập nhật kế hoạch bảo trì');
     }
   };
 
@@ -285,13 +301,19 @@ export default function PlannedMaintenance() {
 
   // Delete Record
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa bản ghi bảo trì kế hoạch này? Thao tác không thể hoàn tác.')) return;
+    const ok = await confirm({
+      title: 'Xóa bản ghi bảo trì kế hoạch',
+      message: 'Bạn có chắc chắn muốn xóa bản ghi bảo trì kế hoạch này? Thao tác không thể hoàn tác.',
+      confirmLabel: 'Xóa bản ghi',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await apiDelete(`/planned-maintenance/${id}`);
       fetchData();
-      alert('Đã xóa bản ghi bảo trì thành công!');
+      toast.success('Đã xóa bản ghi bảo trì thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi xóa bản ghi bảo trì');
+      toast.error(e.message || 'Lỗi khi xóa bản ghi bảo trì');
     }
   };
 
@@ -534,136 +556,180 @@ export default function PlannedMaintenance() {
 
       {/* 4. MAIN DATA TABLE */}
       {activeTab !== 'PRINT' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <DataTableShell
+          title="Kế hoạch bảo trì định kỳ"
+          totalCount={filteredRecords.length}
+          countLabel="hồ sơ"
+          density={density}
+          onDensityChange={setDensity}
+          columns={[
+            { key: 'content', label: 'Nội dung chi tiết', hideable: true },
+          ]}
+          hiddenCols={hiddenCols}
+          onToggleCol={toggleCol}
+          loading={loading}
+          isEmpty={filteredRecords.length === 0}
+          emptyMessage="Không tìm thấy bản ghi bảo trì nào phù hợp."
+        >
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-700 font-bold uppercase border-b border-slate-200">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
                 <tr>
-                  <th className="p-3.5 text-center w-10">STT</th>
-                  <th className="p-3.5">Mã tài sản</th>
-                  <th className="p-3.5">Tên thiết bị & Khoa sử dụng</th>
-                  <th className="p-3.5">Ngày bảo trì</th>
-                  <th className="p-3.5">Hạn bảo trì tiếp</th>
-                  <th className="p-3.5">Chu kỳ</th>
-                  <th className="p-3.5">Đơn vị & Cán bộ thực hiện</th>
-                  <th className="p-3.5">Nội dung bảo trì</th>
-                  <th className="p-3.5">Kết quả</th>
-                  <th className="p-3.5 text-right">Chi phí</th>
-                  <th className="p-3.5 text-right">Thao tác</th>
+                  <th className={`${headPy} px-3.5 w-28 whitespace-nowrap`}>Mã TS</th>
+                  <th className={`${headPy} px-3.5 min-w-[260px] whitespace-nowrap`}>Thiết bị &amp; Nội dung</th>
+                  <th className={`${headPy} px-3.5 whitespace-nowrap`}>Lịch &amp; Hạn kế tiếp</th>
+                  <th className={`${headPy} px-3.5 whitespace-nowrap`}>Đơn vị thực hiện</th>
+                  <th className={`${headPy} px-3.5 text-right whitespace-nowrap`}>Kết quả &amp; Chi phí</th>
+                  <th className={`${headPy} px-3.5 w-28 text-right whitespace-nowrap`}>Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={11} className="text-center py-12 text-slate-400">Đang tải danh sách kế hoạch bảo trì...</td></tr>
-                ) : filteredRecords.length === 0 ? (
-                  <tr><td colSpan={11} className="text-center py-12 text-slate-400">Không tìm thấy bản ghi bảo trì nào phù hợp.</td></tr>
-                ) : (
-                  filteredRecords.map((r, idx) => {
+                {!loading &&
+                  filteredRecords.map((r) => {
                     const isOverdue = r.nextMaintenanceDate && new Date(r.nextMaintenanceDate) < now;
-                    const isUpcoming = r.nextMaintenanceDate && new Date(r.nextMaintenanceDate) >= now && new Date(r.nextMaintenanceDate) <= future30;
+                    const isUpcoming =
+                      r.nextMaintenanceDate &&
+                      new Date(r.nextMaintenanceDate) >= now &&
+                      new Date(r.nextMaintenanceDate) <= future30;
 
                     return (
-                      <tr key={r.id} className="hover:bg-slate-50/80 transition">
-                        <td className="p-3.5 text-center text-slate-500">{idx + 1}</td>
-                        <td className="p-3.5 font-mono font-bold text-emerald-700">
-                          {r.asset?.assetCode || '-'}
+                      <tr key={r.id} className="hover:bg-slate-50/75 transition-colors">
+                        <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/70 font-mono text-[11px] font-medium text-emerald-700">
+                            {r.asset?.assetCode || '-'}
+                          </span>
                         </td>
-                        <td className="p-3.5 max-w-xs">
-                          <div className="font-bold text-slate-900">{r.asset?.name}</div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            🏢 {r.asset?.department?.name || 'CDC'} 
-                            {r.asset?.locationDetail && ` • 📍 ${r.asset.locationDetail}`}
+
+                        <td className={`${cellPy} px-3.5 align-top max-w-[340px]`}>
+                          <div className="font-heading font-semibold text-slate-800 leading-snug line-clamp-2" title={r.asset?.name}>
+                            {r.asset?.name}
                           </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500">
+                            <span className="inline-flex items-center gap-1 truncate max-w-[200px]">
+                              <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{r.asset?.department?.name || 'CDC'}</span>
+                            </span>
+                            {r.asset?.locationDetail && (
+                              <span className="inline-flex items-center gap-1 truncate max-w-[160px]">
+                                <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="truncate">{r.asset.locationDetail}</span>
+                              </span>
+                            )}
+                          </div>
+                          {isColVisible('content') && (
+                            <p className="mt-1 text-[11px] text-slate-500 line-clamp-2 leading-snug break-words">
+                              {r.planContent || 'Bảo dưỡng định kỳ'}
+                            </p>
+                          )}
                         </td>
-                        <td className="p-3.5 text-slate-700 whitespace-nowrap">
-                          {new Date(r.maintenanceDate).toLocaleDateString('vi-VN')}
-                        </td>
-                        <td className="p-3.5 whitespace-nowrap">
+
+                        <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
                           {r.nextMaintenanceDate ? (
-                            <div>
-                              <div className={`font-semibold ${isOverdue ? 'text-red-600' : isUpcoming ? 'text-amber-600' : 'text-slate-800'}`}>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`font-semibold tabular-nums ${
+                                  isOverdue
+                                    ? 'text-rose-600'
+                                    : isUpcoming
+                                      ? 'text-amber-600'
+                                      : 'text-slate-800'
+                                }`}
+                              >
                                 {new Date(r.nextMaintenanceDate).toLocaleDateString('vi-VN')}
-                              </div>
+                              </span>
                               {isOverdue && (
-                                <span className="inline-block px-1.5 py-0.2 bg-red-100 text-red-800 rounded text-[9px] font-bold mt-0.5">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-semibold whitespace-nowrap">
                                   Quá hạn
                                 </span>
                               )}
                               {isUpcoming && (
-                                <span className="inline-block px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded text-[9px] font-bold mt-0.5">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold whitespace-nowrap">
                                   Sắp đến hạn
                                 </span>
                               )}
                             </div>
-                          ) : '-'}
-                        </td>
-                        <td className="p-3.5 text-slate-600">
-                          {r.cycleMonths ? `${r.cycleMonths} tháng` : '6 tháng'}
-                        </td>
-                        <td className="p-3.5 max-w-[180px]">
-                          <div className="font-medium text-slate-800 truncate">{r.vendor || 'Đơn vị kỹ thuật'}</div>
-                          <div className="text-[11px] text-slate-500 truncate">👤 {r.performedBy || '-'}</div>
-                        </td>
-                        <td className="p-3.5 max-w-[200px]">
-                          <div className="text-slate-700 line-clamp-2" title={r.planContent || ''}>
-                            {r.planContent || 'Bảo dưỡng định kỳ'}
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                          <div className="mt-1 text-[11px] text-slate-500 tabular-nums">
+                            Lần cuối: {new Date(r.maintenanceDate).toLocaleDateString('vi-VN')} ·{' '}
+                            {r.cycleMonths ? `${r.cycleMonths} tháng` : '6 tháng'}
                           </div>
                         </td>
-                        <td className="p-3.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            r.result === 'PASS' ? 'bg-emerald-100 text-emerald-800' :
-                            r.result === 'NEEDS_REPAIR' ? 'bg-orange-100 text-orange-800' :
-                            r.result === 'PENDING' ? 'bg-blue-100 text-blue-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {r.result === 'PASS' ? 'Đạt yêu cầu' :
-                             r.result === 'NEEDS_REPAIR' ? 'Cần sửa chữa' :
-                             r.result === 'PENDING' ? 'Đang thực hiện' : 'Không đạt'}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                          {r.cost ? Number(r.cost).toLocaleString('vi-VN') : '0'} đ
-                        </td>
-                        <td className="p-3.5 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleOpenDetail(r)}
-                              className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg transition cursor-pointer"
-                              title="Xem chi tiết bảo trì thiết bị"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleOpenDetail(r)}
-                              className="p-1.5 bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white rounded-lg transition cursor-pointer"
-                              title="In biên bản bảo dưỡng định kỳ thiết bị (A4)"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleOpenEdit(r)}
-                              className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg transition cursor-pointer"
-                              title="Chỉnh sửa hồ sơ bảo trì"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(r.id)}
-                              className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition cursor-pointer"
-                              title="Xóa hồ sơ bảo trì"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+
+                        <td className={`${cellPy} px-3.5 align-top max-w-[240px]`}>
+                          <div className="font-medium text-slate-700 leading-snug break-words">
+                            {r.vendor || 'Đơn vị kỹ thuật'}
                           </div>
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+                            <User className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="leading-snug break-words">{r.performedBy || '-'}</span>
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top text-right whitespace-nowrap`}>
+                          <div>
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                                r.result === 'PASS'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                  : r.result === 'NEEDS_REPAIR'
+                                    ? 'bg-orange-50 text-orange-700 border border-orange-200/70'
+                                    : r.result === 'PENDING'
+                                      ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                      : 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                              }`}
+                            >
+                              {r.result === 'PASS'
+                                ? 'Đạt yêu cầu'
+                                : r.result === 'NEEDS_REPAIR'
+                                  ? 'Cần sửa chữa'
+                                  : r.result === 'PENDING'
+                                    ? 'Đang thực hiện'
+                                    : 'Không đạt'}
+                            </span>
+                          </div>
+                          <div className="mt-1 font-sans font-semibold text-slate-800 tabular-nums">
+                            {r.cost ? Number(r.cost).toLocaleString('vi-VN') : '0'} đ
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top text-right whitespace-nowrap`}>
+                          <RowActionMenu
+                            primary={{
+                              label: 'Xem',
+                              title: 'Xem chi tiết bảo trì thiết bị',
+                              icon: <Eye className="w-3.5 h-3.5" />,
+                              onClick: () => handleOpenDetail(r),
+                              tone: 'emerald',
+                            }}
+                            items={[
+                              {
+                                label: 'In biên bản (A4)',
+                                icon: <Printer className="w-3.5 h-3.5" />,
+                                onClick: () => handleOpenDetail(r),
+                              },
+                              {
+                                label: 'Chỉnh sửa hồ sơ',
+                                icon: <Edit3 className="w-3.5 h-3.5" />,
+                                onClick: () => handleOpenEdit(r),
+                              },
+                              {
+                                label: 'Xóa hồ sơ',
+                                icon: <Trash2 className="w-3.5 h-3.5" />,
+                                onClick: () => handleDelete(r.id),
+                                danger: true,
+                              },
+                            ]}
+                          />
                         </td>
                       </tr>
                     );
-                  })
-                )}
+                  })}
               </tbody>
             </table>
           </div>
-        </div>
+        </DataTableShell>
       )}
 
       {/* ========================================================================= */}
@@ -914,94 +980,15 @@ export default function PlannedMaintenance() {
                 </div>
 
                 {/* Bảng chia cột danh sách thiết bị cần lập kế hoạch bảo trì */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
-                  <div className="max-h-60 overflow-y-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-100/90 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
-                        <tr>
-                          <th className="p-2.5 text-center w-12">Chọn</th>
-                          <th className="p-2.5 w-32">Mã tài sản</th>
-                          <th className="p-2.5">Tên thiết bị</th>
-                          <th className="p-2.5 w-40">Người sử dụng</th>
-                          <th className="p-2.5 w-36">Vị trí phòng máy</th>
-                          <th className="p-2.5 w-20 text-center">Năm SD</th>
-                          <th className="p-2.5 w-28 text-center">Đơn vị</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {filteredAssetsForSelector.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="p-8 text-center text-slate-400 text-xs">
-                              Không tìm thấy thiết bị nào trong khoa đã chọn phù hợp với điều kiện tìm kiếm.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredAssetsForSelector.map(a => {
-                            const isSelected = selectedAssetIds.includes(a.id);
-                            return (
-                              <tr
-                                key={a.id}
-                                onClick={() => handleToggleAsset(a.id)}
-                                className={`transition cursor-pointer select-none ${
-                                  isSelected 
-                                    ? 'bg-emerald-50/95 font-medium text-emerald-950 border-l-4 border-emerald-600' 
-                                    : 'hover:bg-slate-50/80 text-slate-700'
-                                }`}
-                              >
-                                <td className="p-2.5 text-center align-middle">
-                                  <div className="pt-0.5 text-emerald-600 flex items-center justify-center">
-                                    {isSelected ? (
-                                      <CheckSquare className="w-4 h-4 fill-emerald-600 text-white" />
-                                    ) : (
-                                      <Square className="w-4 h-4 text-slate-400" />
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="font-mono font-bold text-emerald-700 bg-emerald-50/90 px-2 py-0.5 rounded text-[11px] border border-emerald-200 inline-block">
-                                    {a.assetCode}
-                                  </span>
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <div className="font-bold text-slate-900">{a.name}</div>
-                                  {a.specifications && (
-                                    <div className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5">{a.specifications}</div>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  {a.assignedTo ? (
-                                    <span className="font-semibold text-slate-800 flex items-center gap-1">
-                                      <span>👤</span> <span>{a.assignedTo}</span>
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 italic">Chưa gán</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="text-slate-700 flex items-center gap-1">
-                                    <span>📍</span> <span>{a.locationDetail || (a as any).floor || 'Tại khoa'}</span>
-                                  </span>
-                                </td>
-                                <td className="p-2.5 text-center align-middle font-mono text-slate-600">
-                                  {a.yearInUse || '-'}
-                                </td>
-                                <td className="p-2.5 text-center align-middle">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    a.managingUnit === 'DUOC' ? 'bg-emerald-100 text-emerald-800' :
-                                    a.managingUnit === 'CNTT' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {a.managingUnit === 'DUOC' ? 'Khoa Dược' : a.managingUnit === 'CNTT' ? 'Tổ CNTT' : 'TCHC'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <AssetPickerTable
+                  mode="multi"
+                  assets={filteredAssetsForSelector}
+                  selectedIds={selectedAssetIds}
+                  onToggle={handleToggleAsset}
+                  showDepartment={false}
+                  accentColor="emerald"
+                  emptyMessage="Không tìm thấy thiết bị nào trong khoa đã chọn phù hợp với điều kiện tìm kiếm."
+                />
               </div>
 
               {/* ========================================================================= */}

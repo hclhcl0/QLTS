@@ -7,9 +7,53 @@ const prisma = new PrismaClient();
 
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const departments = await prisma.department.findMany();
-    res.json(departments);
+    const [departments, groupedAssets] = await Promise.all([
+      prisma.department.findMany({
+        include: {
+          _count: {
+            select: { assets: true, users: true },
+          },
+        },
+        orderBy: { id: 'asc' },
+      }),
+      prisma.asset.groupBy({
+        by: ['departmentId', 'managingUnit', 'buildingAsset'],
+        _count: { _all: true },
+      }),
+    ]);
+
+    const breakdownMap: Record<
+      number,
+      { total: number; duoc: number; cntt: number; tchcHc: number; tchcMe: number }
+    > = {};
+
+    for (const g of groupedAssets) {
+      const dId = g.departmentId;
+      if (!breakdownMap[dId]) {
+        breakdownMap[dId] = { total: 0, duoc: 0, cntt: 0, tchcHc: 0, tchcMe: 0 };
+      }
+      const cnt = g._count._all;
+      breakdownMap[dId].total += cnt;
+      if (g.managingUnit === 'DUOC') breakdownMap[dId].duoc += cnt;
+      else if (g.managingUnit === 'CNTT') breakdownMap[dId].cntt += cnt;
+      else if (g.managingUnit === 'TCHC' && g.buildingAsset === 1) breakdownMap[dId].tchcMe += cnt;
+      else if (g.managingUnit === 'TCHC') breakdownMap[dId].tchcHc += cnt;
+    }
+
+    const enriched = departments.map((d) => ({
+      ...d,
+      assetBreakdown: breakdownMap[d.id] || {
+        total: d._count?.assets || 0,
+        duoc: 0,
+        cntt: 0,
+        tchcHc: 0,
+        tchcMe: 0,
+      },
+    }));
+
+    res.json(enriched);
   } catch (error) {
+    console.error('Error loading departments:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

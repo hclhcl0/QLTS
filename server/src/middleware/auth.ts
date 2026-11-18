@@ -3,61 +3,87 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const SECRET_KEY = 'qlts-cdc-danang-secret-key-2026';
+export const JWT_SECRET = process.env.JWT_SECRET || 'qlts-cdc-danang-secret-key-2026';
 
 export interface AuthRequest extends Request {
   user?: any;
+}
+
+export const MANAGER_UNIT_BY_ROLE: Record<string, string> = {
+  MANAGER_DUOC: 'DUOC',
+  MANAGER_CNTT: 'CNTT',
+  MANAGER_TCHC: 'TCHC',
+};
+
+export function getManagingUnitForRole(role?: string | null): string | null {
+  if (!role) return null;
+  return MANAGER_UNIT_BY_ROLE[role] || null;
+}
+
+export function canAccessAssetRecord(user: any, asset: { managingUnit?: string | null; departmentId?: number | null }): boolean {
+  if (!user) return false;
+  if (user.role === 'ADMIN' || user.role === 'VIEWER') return true;
+  const unit = getManagingUnitForRole(user.role);
+  if (unit) return asset.managingUnit === unit;
+  if (user.role === 'DEPARTMENT') {
+    return Boolean(user.departmentId && asset.departmentId === user.departmentId);
+  }
+  return false;
 }
 
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // Local development fallback: default to admin user
-      const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-      req.user = defaultAdmin || { id: 1, username: 'admin', role: 'ADMIN', fullName: 'Administrator' };
-      return next();
+      return res.status(401).json({ error: 'Vui lòng đăng nhập để truy cập hệ thống.' });
     }
 
-    const token = authHeader.split(' ')[1];
-
-    if (token === 'mock-admin-token' || token === 'fake-token' || token === 'admin') {
-      const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-      req.user = defaultAdmin || { id: 1, username: 'admin', role: 'ADMIN', fullName: 'Administrator' };
-      return next();
+    const token = authHeader.slice(7).trim();
+    if (!token) {
+      return res.status(401).json({ error: 'Token xác thực không hợp lệ.' });
     }
 
-    if (token === 'mock-dept-token') {
-      req.user = { id: 2, username: 'pkdk', role: 'DEPARTMENT', fullName: 'Phòng Khám Đa Khoa', departmentId: 1 };
-      return next();
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId?: number };
+    if (!decoded?.userId) {
+      return res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ.' });
     }
 
-    try {
-      const decoded = jwt.verify(token, SECRET_KEY) as any;
-      const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-      if (user) {
-        req.user = user;
-        return next();
-      }
-    } catch {
-      // fallback to admin in dev
-      const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-      req.user = defaultAdmin || { id: 1, username: 'admin', role: 'ADMIN', fullName: 'Administrator' };
-      return next();
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        role: true,
+        departmentId: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Tài khoản không tồn tại hoặc đã bị xóa.' });
     }
 
-    const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-    req.user = defaultAdmin || { id: 1, username: 'admin', role: 'ADMIN', fullName: 'Administrator' };
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid authentication' });
+    req.user = user;
+    return next();
+  } catch {
+    return res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ.' });
   }
 };
 
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   if (req.user && req.user.role === 'ADMIN') {
-    next();
-  } else {
-    return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    return next();
   }
+  return res.status(403).json({ error: 'Từ chối truy cập: Chức năng chỉ dành cho Quản trị viên (ADMIN).' });
+};
+
+export const requireRoles = (...allowedRoles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user && allowedRoles.includes(req.user.role)) {
+      return next();
+    }
+    return res.status(403).json({
+      error: 'Bạn không có quyền thực hiện thao tác này.',
+    });
+  };
 };

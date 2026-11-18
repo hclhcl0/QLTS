@@ -22,6 +22,14 @@ export default function QRScanner() {
       let clean = code.trim();
       if (clean.includes('/qr/')) {
         clean = clean.split('/qr/').pop() || clean;
+        try {
+          clean = decodeURIComponent(clean);
+        } catch {}
+      } else {
+        const matchCodeLine = clean.match(/(?:^|\n)\s*(?:Ma TS|Mã TS)\s*:\s*([^\r\n]+)/i);
+        if (matchCodeLine && matchCodeLine[1]) {
+          clean = matchCodeLine[1].trim();
+        }
       }
 
       // Try fetching by asset code or ID
@@ -160,7 +168,7 @@ export default function QRScanner() {
               Xem toàn bộ lịch sử thiết bị
             </button>
             <button
-              onClick={() => navigate('/maintenance')}
+              onClick={() => navigate(`/maintenance?assetId=${assetData.id}`)}
               className="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
             >
               <Wrench className="w-3.5 h-3.5" /> Báo hỏng máy này

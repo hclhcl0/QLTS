@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Check, X, ArrowLeftRight, Building, Calendar, ArrowRight, Search, CheckCircle2 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../lib/api';
 import { Asset, Department, AssetTransfer } from '../types';
+import { matchesSmartSearchClient } from '../utils/superSortSearch';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast';
+import AssetPickerTable from '../components/ui/AssetPickerTable';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 
 export default function Transfers() {
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [transfers, setTransfers] = useState<AssetTransfer[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -27,7 +35,7 @@ export default function Transfers() {
     try {
       const [tRes, aRes, dRes] = await Promise.allSettled([
         apiGet('/transfers'),
-        apiGet('/assets?limit=5000'),
+        apiGet('/assets?limit=10000'),
         apiGet('/departments')
       ]);
 
@@ -50,6 +58,20 @@ export default function Transfers() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const preselectId = searchParams.get('assetId');
+    if (!preselectId || assets.length === 0) return;
+    const match = assets.find((a) => a.id.toString() === preselectId);
+    if (match) {
+      setAssetId(match.id.toString());
+      if (match.departmentId) setFromDeptId(match.departmentId.toString());
+      setShowForm(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('assetId');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, assets, setSearchParams]);
+
   const filteredTransferAssets = useMemo(() => {
     return assets.filter(a => {
       if (user?.role === 'DEPARTMENT' && user.departmentId && a.departmentId !== user.departmentId) {
@@ -58,14 +80,8 @@ export default function Transfers() {
       if (unitFilter !== 'ALL' && (a as any).managingUnit !== unitFilter) {
         return false;
       }
-      if (assetSearch.trim()) {
-        const q = assetSearch.toLowerCase();
-        const matchCode = a.assetCode?.toLowerCase().includes(q);
-        const matchName = a.name?.toLowerCase().includes(q);
-        const matchUser = a.assignedTo?.toLowerCase().includes(q);
-        const matchLoc = a.locationDetail?.toLowerCase().includes(q);
-        const matchDept = a.department?.name?.toLowerCase().includes(q);
-        if (!matchCode && !matchName && !matchUser && !matchLoc && !matchDept) return false;
+      if (assetSearch.trim() && !matchesSmartSearchClient(a, assetSearch)) {
+        return false;
       }
       return true;
     });
@@ -86,12 +102,12 @@ export default function Transfers() {
   const handleCreateTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assetId || !fromDeptId || !toDeptId) {
-      alert('Vui lòng chọn đầy đủ thiết bị, khoa chuyển đi và khoa nhận!');
+      toast.warning('Vui lòng chọn đầy đủ thiết bị, khoa chuyển đi và khoa nhận!');
       return;
     }
 
     if (fromDeptId === toDeptId) {
-      alert('Khoa nhận phải khác khoa chuyển đi!');
+      toast.warning('Khoa nhận phải khác khoa chuyển đi!');
       return;
     }
 
@@ -104,11 +120,11 @@ export default function Transfers() {
         note
       });
 
-      alert('Tạo phiếu điều chuyển thành công!');
+      toast.success('Tạo phiếu điều chuyển thành công!');
       setShowForm(false);
       fetchData();
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi tạo phiếu điều chuyển');
+      toast.error(e.message || 'Lỗi khi tạo phiếu điều chuyển');
     }
   };
 
@@ -116,21 +132,27 @@ export default function Transfers() {
     try {
       await apiPut(`/transfers/${id}/approve`, {});
       await apiPut(`/transfers/${id}/complete`, {});
-      alert('Đã phê duyệt và hoàn tất điều chuyển thiết bị!');
+      toast.success('Đã phê duyệt và hoàn tất điều chuyển thiết bị!');
       fetchData();
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi phê duyệt');
+      toast.error(e.message || 'Lỗi khi phê duyệt');
     }
   };
 
   const handleReject = async (id: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn từ chối yêu cầu điều chuyển này?')) return;
+    const ok = await confirm({
+      title: 'Từ chối yêu cầu điều chuyển',
+      message: 'Bạn có chắc chắn muốn từ chối yêu cầu điều chuyển này?',
+      confirmLabel: 'Từ chối',
+      variant: 'warning',
+    });
+    if (!ok) return;
     try {
       await apiPut(`/transfers/${id}/reject`, {});
-      alert('Đã từ chối phiếu điều chuyển');
+      toast.info('Đã từ chối phiếu điều chuyển');
       fetchData();
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi từ chối');
+      toast.error(e.message || 'Lỗi khi từ chối');
     }
   };
 
@@ -244,92 +266,16 @@ export default function Transfers() {
                 </div>
 
                 {/* Bảng chia cột danh sách thiết bị điều chuyển */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
-                  <div className="max-h-56 overflow-y-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-100/90 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
-                        <tr>
-                          <th className="p-2.5 text-center w-12">Chọn</th>
-                          <th className="p-2.5 w-32">Mã tài sản</th>
-                          <th className="p-2.5">Tên thiết bị</th>
-                          <th className="p-2.5 w-44">Khoa đang quản lý</th>
-                          <th className="p-2.5 w-36">Người sử dụng</th>
-                          <th className="p-2.5 w-32">Vị trí phòng</th>
-                          <th className="p-2.5 w-24 text-center">Đơn vị</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {filteredTransferAssets.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="p-6 text-center text-slate-400 text-xs">
-                              Không tìm thấy thiết bị nào phù hợp điều kiện tìm kiếm.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredTransferAssets.map(a => {
-                            const isSelected = assetId === a.id.toString();
-                            return (
-                              <tr
-                                key={a.id}
-                                onClick={() => handleAssetChange(a.id.toString())}
-                                className={`transition cursor-pointer select-none ${
-                                  isSelected 
-                                    ? 'bg-blue-50/95 font-medium text-blue-900 border-l-4 border-blue-600' 
-                                    : 'hover:bg-slate-50/80 text-slate-700'
-                                }`}
-                              >
-                                <td className="p-2.5 text-center align-middle">
-                                  {isSelected ? (
-                                    <CheckCircle2 className="w-4 h-4 text-blue-600 fill-blue-100 mx-auto" />
-                                  ) : (
-                                    <div className="w-4 h-4 rounded-full border-2 border-slate-300 mx-auto" />
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="font-mono font-bold text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded text-[11px] border border-blue-200 inline-block">
-                                    {a.assetCode}
-                                  </span>
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <div className="font-bold text-slate-900">{a.name}</div>
-                                  {a.specifications && (
-                                    <div className="text-[10px] text-slate-400 truncate max-w-[200px] mt-0.5">{a.specifications}</div>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle font-medium text-slate-800">
-                                  {a.department?.name || 'CDC'}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  {a.assignedTo ? (
-                                    <span className="font-semibold text-slate-800 flex items-center gap-1">
-                                      <span>👤</span> <span>{a.assignedTo}</span>
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 italic">Chưa gán</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="text-slate-700 flex items-center gap-1">
-                                    <span>📍</span> <span>{a.locationDetail || (a as any).floor || 'Tại khoa'}</span>
-                                  </span>
-                                </td>
-                                <td className="p-2.5 text-center align-middle">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    (a as any).managingUnit === 'DUOC' ? 'bg-emerald-100 text-emerald-800' :
-                                    (a as any).managingUnit === 'CNTT' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {(a as any).managingUnit === 'DUOC' ? 'Khoa Dược' : (a as any).managingUnit === 'CNTT' ? 'Tổ CNTT' : 'TCHC'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <AssetPickerTable
+                  mode="single"
+                  assets={filteredTransferAssets}
+                  selectedId={assetId}
+                  showDepartment={true}
+                  accentColor="blue"
+                  maxHeightClass="max-h-56"
+                  emptyMessage="Không tìm thấy thiết bị nào phù hợp điều kiện tìm kiếm."
+                  onSelect={(a) => handleAssetChange(a.id.toString())}
+                />
               </div>
 
               <div>

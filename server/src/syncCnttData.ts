@@ -35,23 +35,34 @@ export async function syncCnttRecords(
     }
   }).catch(() => -1);
 
-  const hasUnmergedComputers = await prisma.asset.count({
+  const needsFixCount = await prisma.asset.count({
     where: {
       OR: [
-        { assetCode: { startsWith: 'CPU/' } },
-        { assetCode: { startsWith: 'MH/' } },
         { assetCode: { startsWith: 'CNTT' } },
-        { assetCode: { startsWith: 'PC/' } }
+        { assetCode: { startsWith: 'PC/' } },
+        { assetCode: 'TB/BNN-001' },
+        { assetCode: 'VT/BNN-001', originalPrice: { lt: 20000000 } },
+        { assetCode: 'VT/BNN-012', NOT: { status: 'HONG' } },
+        { assetCode: 'VT/KDYT-004', NOT: { oldAssetCode: { contains: 'CPU/KDYT-008' } } },
+        { assetCode: 'VT/HIV-CS2-011', name: { startsWith: 'Màn hình' } },
+        { assetCode: 'VT/TCKT-CS2-002', name: { startsWith: 'Màn hình' } },
+        { assetCode: 'MH/KLN-001', status: 'DANG_SU_DUNG' },
+        { assetCode: 'VT/DUOC-001', originalPrice: 10000000 },
+        { assetCode: 'TB/KDYT-CS2-001', originalPrice: 5000000 },
+        { assetCode: 'VT/XN-006', NOT: { status: 'HONG' } },
+        { assetCode: 'TB/TT-001', NOT: { status: 'KHONG_SU_DUNG' } },
+        { assetCode: 'MI/HIV-CS2-008', NOT: { status: 'CHO_THANH_LY' } },
+        { assetCode: 'TB/KHNV-007', NOT: { assignedTo: null } }
       ]
     }
   }).catch(() => 0);
 
-  if (!force && totalCnttCount === 675 && pkdkCnttCount === 64 && hasUnmergedComputers === 0) {
-    log('[CNTT Sync] CNTT assets are already clean and up-to-date (675 assets, 64 in PKDK). No sync needed.');
+  if (!force && totalCnttCount === 678 && pkdkCnttCount === 64 && needsFixCount === 0) {
+    log('[CNTT Sync] CNTT assets are already clean and up-to-date (678 assets, 64 in PKDK). No sync needed.');
     return { ok: true, synced: 0, message: 'Already up to date', total: totalCnttCount, pkdk: pkdkCnttCount };
   }
 
-  log(`[CNTT Sync] Sync needed: totalCnttCount=${totalCnttCount}, pkdkCnttCount=${pkdkCnttCount}, hasUnmerged=${hasUnmergedComputers}, force=${force}`);
+  log(`[CNTT Sync] Sync needed: totalCnttCount=${totalCnttCount}, pkdkCnttCount=${pkdkCnttCount}, needsFixCount=${needsFixCount}, force=${force}`);
 
   // Locate initial-seed-data.json
   const seedDataCandidates = [

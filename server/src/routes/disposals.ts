@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+import { requireAuth, requireAdmin, requireRoles, getManagingUnitForRole } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -83,6 +83,9 @@ router.get('/', requireAuth, async (req: any, res) => {
 
 // Create disposal proposal(s) (submitted by Department / Khoa phòng - supports single, multiple, or detailed items list)
 router.post('/', requireAuth, async (req: any, res) => {
+  if (req.user?.role === 'VIEWER') {
+    return res.status(403).json({ error: 'Tài khoản Chỉ xem không thể gửi đề xuất thanh lý.' });
+  }
   try {
     const { assetId, assetIds, items, reason, proposedBy, campaignName, departmentId } = req.body;
     
@@ -163,9 +166,18 @@ router.post('/', requireAuth, async (req: any, res) => {
 });
 
 // Technical Inspection: Record inspection result & assessment by managing unit (Dược / CNTT / TCHC)
-router.put('/:id/inspect', requireAuth, async (req: any, res) => {
+router.put('/:id/inspect', requireAuth, requireRoles('ADMIN', 'MANAGER_DUOC', 'MANAGER_CNTT', 'MANAGER_TCHC'), async (req: any, res) => {
   try {
     const disposalId = parseInt(req.params.id);
+    const existing = await prisma.disposal.findUnique({
+      where: { id: disposalId },
+      include: { asset: { select: { managingUnit: true } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'Không tìm thấy đề xuất thanh lý' });
+    const unitScope = getManagingUnitForRole(req.user?.role);
+    if (unitScope && existing.asset?.managingUnit !== unitScope) {
+      return res.status(403).json({ error: 'Bạn chỉ được giám định kỹ thuật tài sản thuộc khối phụ trách.' });
+    }
     const { technicalAssessment, technicalInspector, disposalMethod, disposalPrice, note, decisionNumber, fundingSource } = req.body;
     const now = new Date().toISOString();
 
@@ -232,11 +244,18 @@ router.put('/:id/complete', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // Reject disposal proposal
-router.put('/:id/reject', requireAuth, async (req: any, res) => {
+router.put('/:id/reject', requireAuth, requireRoles('ADMIN', 'MANAGER_DUOC', 'MANAGER_CNTT', 'MANAGER_TCHC'), async (req: any, res) => {
   try {
     const disposalId = parseInt(req.params.id);
-    const disposal = await prisma.disposal.findUnique({ where: { id: disposalId } });
+    const disposal = await prisma.disposal.findUnique({
+      where: { id: disposalId },
+      include: { asset: { select: { managingUnit: true } } },
+    });
     if (!disposal) return res.status(404).json({ error: 'Not found' });
+    const unitScope = getManagingUnitForRole(req.user?.role);
+    if (unitScope && disposal.asset?.managingUnit !== unitScope) {
+      return res.status(403).json({ error: 'Bạn chỉ được từ chối đề xuất thanh lý thuộc khối phụ trách.' });
+    }
 
     await prisma.$transaction([
       prisma.disposal.update({

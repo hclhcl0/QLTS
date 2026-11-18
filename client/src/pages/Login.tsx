@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Building2, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
 import { apiPost } from '../lib/api';
 
 export default function Login() {
@@ -41,16 +41,18 @@ export default function Login() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* CDC Logo / Icon */}
         <div className="flex justify-center">
-          <div className="p-3.5 bg-blue-600 rounded-3xl text-white shadow-lg shadow-blue-500/25 ring-8 ring-blue-50">
-            <Building2 className="w-10 h-10" />
-          </div>
+          <img
+            src="/cdc-logo.png"
+            alt="Logo CDC Đà Nẵng"
+            className="w-20 h-20 rounded-2xl object-contain shadow-lg shadow-blue-900/20 ring-4 ring-white"
+          />
         </div>
 
         {/* Title */}
-        <h1 className="mt-5 text-center text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
+        <h1 className="mt-5 text-center font-heading text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight uppercase">
           Quản Lý Tài Sản & Thiết Bị
         </h1>
-        <p className="mt-1 text-center text-xs sm:text-sm font-semibold text-blue-600 uppercase tracking-wider">
+        <p className="mt-1 text-center text-xs sm:text-sm font-medium text-blue-700 uppercase tracking-wider">
           Trung tâm Kiểm soát bệnh tật TP Đà Nẵng (CDC)
         </p>
       </div>

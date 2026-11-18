@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRoles } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
+const requireCommitteeEditor = requireRoles('ADMIN', 'MANAGER_DUOC', 'MANAGER_CNTT', 'MANAGER_TCHC');
 
 // List all committee members
 router.get('/', requireAuth, async (req, res) => {
@@ -28,7 +29,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // Create member
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireCommitteeEditor, async (req, res) => {
   try {
     const member = await prisma.inventoryCommitteeMember.create({
       data: req.body
@@ -41,7 +42,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // Update member
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, requireCommitteeEditor, async (req, res) => {
   try {
     const member = await prisma.inventoryCommitteeMember.update({
       where: { id: parseInt(req.params.id) },
@@ -55,7 +56,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // Delete member
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, requireCommitteeEditor, async (req, res) => {
   try {
     await prisma.inventoryCommitteeMember.delete({
       where: { id: parseInt(req.params.id) }

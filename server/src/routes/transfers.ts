@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+import { requireAuth, requireAdmin, requireRoles, getManagingUnitForRole } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -43,9 +43,16 @@ router.get('/', requireAuth, async (req: any, res) => {
   }
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, async (req: any, res) => {
+  if (req.user?.role === 'VIEWER') {
+    return res.status(403).json({ error: 'Tài khoản Chỉ xem không thể tạo phiếu điều chuyển.' });
+  }
   try {
-    const transfer = await prisma.assetTransfer.create({ data: req.body });
+    const data = { ...req.body };
+    if (req.user?.role === 'DEPARTMENT' && req.user?.departmentId) {
+      data.fromDepartmentId = req.user.departmentId;
+    }
+    const transfer = await prisma.assetTransfer.create({ data });
     res.status(201).json(transfer);
   } catch (error) {
     res.status(400).json({ error: 'Error creating transfer' });
@@ -64,10 +71,19 @@ router.put('/:id/approve', requireAuth, requireAdmin, async (req: any, res) => {
   }
 });
 
-router.put('/:id/reject', requireAuth, async (req, res) => {
+router.put('/:id/reject', requireAuth, requireRoles('ADMIN', 'MANAGER_DUOC', 'MANAGER_CNTT', 'MANAGER_TCHC'), async (req: any, res) => {
   try {
-    const transfer = await prisma.assetTransfer.update({
+    const existing = await prisma.assetTransfer.findUnique({
       where: { id: parseInt(req.params.id) },
+      include: { asset: { select: { managingUnit: true } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'Transfer not found' });
+    const unitScope = getManagingUnitForRole(req.user?.role);
+    if (unitScope && existing.asset?.managingUnit !== unitScope) {
+      return res.status(403).json({ error: 'Bạn không có quyền từ chối phiếu điều chuyển ngoài khối phụ trách.' });
+    }
+    const transfer = await prisma.assetTransfer.update({
+      where: { id: existing.id },
       data: { status: 'REJECTED' }
     });
     res.json(transfer);
@@ -76,11 +92,18 @@ router.put('/:id/reject', requireAuth, async (req, res) => {
   }
 });
 
-router.put('/:id/complete', requireAuth, async (req, res) => {
+router.put('/:id/complete', requireAuth, requireRoles('ADMIN', 'MANAGER_DUOC', 'MANAGER_CNTT', 'MANAGER_TCHC'), async (req: any, res) => {
   try {
     const transferId = parseInt(req.params.id);
-    const transfer = await prisma.assetTransfer.findUnique({ where: { id: transferId } });
+    const transfer = await prisma.assetTransfer.findUnique({
+      where: { id: transferId },
+      include: { asset: { select: { managingUnit: true } } },
+    });
     if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
+    const unitScope = getManagingUnitForRole(req.user?.role);
+    if (unitScope && transfer.asset?.managingUnit !== unitScope) {
+      return res.status(403).json({ error: 'Bạn không có quyền hoàn tất điều chuyển ngoài khối phụ trách.' });
+    }
 
     const result = await prisma.$transaction([
       prisma.assetTransfer.update({

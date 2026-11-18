@@ -1,16 +1,39 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Plus, Search, Filter, Wrench, AlertTriangle, CheckCircle, Clock, 
   XCircle, Printer, Building2, Monitor, Stethoscope, Layers, FileText,
   Calendar, DollarSign, User, Phone, CheckCircle2, ChevronRight, BarChart2, Users,
-  Download, Edit3, Trash2, Eye, X, Check
+  Download, Edit3, Trash2, Eye, X, Check, MapPin, Settings,
+  Laptop, Camera, Copy, KeyRound, Image as ImageIcon
 } from 'lucide-react';
-import { apiGet, apiPost, apiPut, apiDelete } from '../lib/api';
+import { apiGet, apiPut, apiDelete, apiDownload } from '../lib/api';
 import { MaintenanceRequest, Asset, Department, PRIORITY_LABELS } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
+import DataTableShell, { useTablePrefs } from '../components/ui/DataTableShell';
+import RowActionMenu from '../components/ui/RowActionMenu';
+import AssetPickerTable from '../components/ui/AssetPickerTable';
+import CreateMaintenanceModal from '../components/CreateMaintenanceModal';
+
+function parseAttachments(raw?: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((u): u is string => typeof u === 'string' && u.length > 0) : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function Maintenance() {
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [telegramActive, setTelegramActive] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<'LIST' | 'REPORT'>('LIST');
 
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
@@ -29,6 +52,7 @@ export default function Maintenance() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [unitFilter, setUnitFilter] = useState('ALL');
+  const { density, setDensity, cellPy, headPy } = useTablePrefs('maintenance');
   const [deptFilter, setDeptFilter] = useState('ALL');
 
   // Periodic Report Filter State
@@ -41,6 +65,7 @@ export default function Maintenance() {
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createInitialAssetId, setCreateInitialAssetId] = useState<string | null>(null);
   const [showProcessModal, setShowProcessModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -49,18 +74,6 @@ export default function Maintenance() {
   // Export Dialog State
   const [exportSortBy, setExportSortBy] = useState('date');
   const [exportSortOrder, setExportSortOrder] = useState('desc');
-
-  // Create Form State with Cascading Selections
-  const [formData, setFormData] = useState({
-    departmentId: user?.departmentId ? user.departmentId.toString() : '1',
-    managingUnit: 'CNTT',
-    assetId: '',
-    requestedBy: user?.fullName || '',
-    contactPhone: '',
-    locationDetail: '',
-    issueDescription: '',
-    priority: 'MEDIUM'
-  });
 
   // Edit All Fields Form State
   const [editData, setEditData] = useState<any>({
@@ -71,7 +84,10 @@ export default function Maintenance() {
     requestedBy: '',
     contactPhone: '',
     locationDetail: '',
+    issueType: 'HARDWARE',
     issueDescription: '',
+    ultraViewId: '',
+    ultraViewPass: '',
     priority: 'MEDIUM',
     status: 'PENDING',
     maintenanceType: 'SUA_CHUA',
@@ -133,15 +149,19 @@ export default function Maintenance() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [reqRes, assetRes, deptRes] = await Promise.allSettled([
+      const [reqRes, assetRes, deptRes, tgRes] = await Promise.allSettled([
         apiGet('/maintenance'),
-        apiGet('/assets?limit=5000'),
-        apiGet('/departments')
+        apiGet('/assets?limit=10000'),
+        apiGet('/departments'),
+        apiGet('/settings/telegram'),
       ]);
 
       if (reqRes.status === 'fulfilled' && Array.isArray(reqRes.value)) setRequests(reqRes.value);
       if (assetRes.status === 'fulfilled' && assetRes.value?.assets) setAssets(assetRes.value.assets);
       if (deptRes.status === 'fulfilled' && Array.isArray(deptRes.value)) setDepartments(deptRes.value);
+      if (tgRes.status === 'fulfilled' && tgRes.value) {
+        setTelegramActive(Boolean(tgRes.value.enabled && tgRes.value.configured));
+      }
     } catch (error) {
       console.error('Error loading maintenance data:', error);
     } finally {
@@ -152,6 +172,33 @@ export default function Maintenance() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const quickReport = searchParams.get('quickReport');
+    if (quickReport === '1') {
+      if (user?.role !== 'VIEWER') {
+        setActiveTab('LIST');
+        setCreateInitialAssetId(null);
+        setShowCreateModal(true);
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete('quickReport');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    const preselectId = searchParams.get('assetId');
+    if (!preselectId || assets.length === 0) return;
+    const match = assets.find((a) => a.id.toString() === preselectId);
+    if (match) {
+      setActiveTab('LIST');
+      setCreateInitialAssetId(match.id.toString());
+      setShowCreateModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('assetId');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, assets, setSearchParams, user]);
 
   // Load periodic report data
   const loadReportData = async () => {
@@ -175,38 +222,7 @@ export default function Maintenance() {
     }
   }, [activeTab, reportPeriodType, reportYear, reportMonth, reportQuarter]);
 
-  const [createAssetSearch, setCreateAssetSearch] = useState('');
   const [editAssetSearch, setEditAssetSearch] = useState('');
-
-  // Filter available assets based on chosen Department AND Managing Unit for Create Modal
-  const departmentAssets = useMemo(() => {
-    return assets
-      .filter(a => {
-        const targetDeptId = user?.role === 'DEPARTMENT' && user.departmentId ? user.departmentId.toString() : formData.departmentId;
-        const deptMatch = !targetDeptId || a.departmentId?.toString() === targetDeptId;
-        const chosenUnit = formData.managingUnit;
-        const unitMatch = !chosenUnit || chosenUnit === 'ALL' ||
-          (a as any).managingUnit === chosenUnit || 
-          (chosenUnit === 'CNTT' && a.categoryId === 2) ||
-          (chosenUnit === 'DUOC' && a.categoryId === 1) ||
-          (chosenUnit === 'TCHC' && (a.categoryId === 3 || a.categoryId === 4));
-        
-        if (!deptMatch || !unitMatch) return false;
-
-        if (createAssetSearch.trim()) {
-          const q = createAssetSearch.toLowerCase();
-          const matchCode = a.assetCode?.toLowerCase().includes(q);
-          const matchName = a.name?.toLowerCase().includes(q);
-          const matchUser = a.assignedTo?.toLowerCase().includes(q);
-          const matchLoc = a.locationDetail?.toLowerCase().includes(q) || (a as any).floor?.toLowerCase().includes(q);
-          const matchSpec = a.specifications?.toLowerCase().includes(q);
-          if (!matchCode && !matchName && !matchUser && !matchLoc && !matchSpec) return false;
-        }
-
-        return true;
-      })
-      .sort((a, b) => (a.assetCode || '').localeCompare(b.assetCode || '', undefined, { numeric: true, sensitivity: 'base' }));
-  }, [assets, formData.departmentId, formData.managingUnit, user, createAssetSearch]);
 
   // Filter available assets for Edit Modal - ALWAYS include editingRequest's asset so it maps perfectly
   const editDepartmentAssets = useMemo(() => {
@@ -247,35 +263,14 @@ export default function Maintenance() {
     return list.sort((a, b) => (a.assetCode || '').localeCompare(b.assetCode || '', undefined, { numeric: true, sensitivity: 'base' }));
   }, [assets, editData.departmentId, editData.managingUnit, editData.assetId, editingRequest, editAssetSearch]);
 
-  const selectedCreateAsset = assets.find(a => a.id.toString() === formData.assetId);
   const selectedEditAsset = assets.find(a => a.id.toString() === editData.assetId) || editingRequest?.asset;
 
-  // Handle Create Request
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.assetId || !formData.requestedBy || !formData.issueDescription) {
-      alert('Vui lòng điền đủ: Khoa/phòng, Thiết bị hỏng, Người báo hỏng và Mô tả sự cố!');
-      return;
-    }
-
-    try {
-      await apiPost('/maintenance', formData);
-      setShowCreateModal(false);
-      setFormData({
-        departmentId: user?.departmentId ? user.departmentId.toString() : '1',
-        managingUnit: 'CNTT',
-        assetId: '',
-        requestedBy: user?.fullName || '',
-        contactPhone: '',
-        locationDetail: '',
-        issueDescription: '',
-        priority: 'MEDIUM'
-      });
-      loadData();
-      alert('Đã gửi phiếu yêu cầu sửa chữa đến đơn vị quản lý chuyên trách thành công!');
-    } catch (e: any) {
-      alert(e.message || 'Lỗi khi tạo yêu cầu sửa chữa');
-    }
+  const copyText = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text).then(
+      () => toast.success(`Đã sao chép ${label}: ${text}`),
+      () => toast.info(`${label}: ${text}`)
+    );
   };
 
   // Open Edit Modal (Chỉnh sửa toàn bộ nội dung phiếu)
@@ -293,7 +288,10 @@ export default function Maintenance() {
       requestedBy: req.requestedBy || '',
       contactPhone: (req as any).contactPhone || '',
       locationDetail: (req as any).locationDetail || req.asset?.locationDetail || '',
+      issueType: req.issueType || 'HARDWARE',
       issueDescription: req.issueDescription || '',
+      ultraViewId: req.ultraViewId || '',
+      ultraViewPass: req.ultraViewPass || '',
       priority: req.priority || 'MEDIUM',
       status: req.status || 'PENDING',
       maintenanceType: (req as any).maintenanceType || 'SUA_CHUA',
@@ -317,16 +315,16 @@ export default function Maintenance() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editData.requestedBy || !editData.issueDescription) {
-      alert('Vui lòng nhập người đề nghị và mô tả sự cố!');
+      toast.warning('Vui lòng nhập người đề nghị và mô tả sự cố!');
       return;
     }
     try {
       await apiPut(`/maintenance/${editData.id}`, editData);
       setShowEditModal(false);
       loadData();
-      alert('Đã cập nhật toàn bộ thông tin phiếu sửa chữa/bảo trì thành công!');
+      toast.success('Đã cập nhật toàn bộ thông tin phiếu sửa chữa/bảo trì thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi cập nhật phiếu');
+      toast.error(e.message || 'Lỗi khi cập nhật phiếu');
     }
   };
 
@@ -339,18 +337,24 @@ export default function Maintenance() {
 
   // Delete Request
   const handleDeleteRequest = async (id: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa phiếu báo hỏng / sửa chữa này?')) return;
+    const ok = await confirm({
+      title: 'Xóa phiếu báo hỏng / sửa chữa',
+      message: 'Bạn có chắc chắn muốn xóa phiếu báo hỏng / sửa chữa này?',
+      confirmLabel: 'Xóa phiếu',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await apiDelete(`/maintenance/${id}`);
       loadData();
-      alert('Đã xóa phiếu thành công!');
+      toast.success('Đã xóa phiếu thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi xóa phiếu');
+      toast.error(e.message || 'Lỗi khi xóa phiếu');
     }
   };
 
   // Handle Export Excel with user criteria
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const params = new URLSearchParams();
     const effectiveDept = user?.role === 'DEPARTMENT' && user.departmentId ? user.departmentId.toString() : deptFilter;
     if (effectiveDept && effectiveDept !== 'ALL') params.append('departmentId', effectiveDept);
@@ -360,7 +364,12 @@ export default function Maintenance() {
     params.append('sortBy', exportSortBy);
     params.append('sortOrder', exportSortOrder);
 
-    window.open(`/api/export/maintenance?${params.toString()}`, '_blank');
+    try {
+      await apiDownload(`/export/maintenance?${params.toString()}`, 'bao_hong_sua_chua.xlsx');
+      toast.success('Đã xuất danh sách sửa chữa ra file Excel.');
+    } catch (e: any) {
+      toast.error(e.message || 'Không thể xuất file Excel');
+    }
     setShowExportModal(false);
   };
 
@@ -391,19 +400,21 @@ export default function Maintenance() {
       await apiPut(`/maintenance/${selectedRequest.id}/process`, processData);
       setShowProcessModal(false);
       loadData();
-      alert('Đã cập nhật tiến độ xử lý và đồng bộ lịch sử thiết bị thành công!');
+      toast.success('Đã cập nhật tiến độ xử lý và đồng bộ lịch sử thiết bị thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi cập nhật phiếu');
+      toast.error(e.message || 'Lỗi khi cập nhật phiếu');
     }
   };
 
   // Filter requests
   const filteredRequests = requests.filter(r => {
+    const q = search.toLowerCase();
     const searchMatch = !search || 
-      r.asset?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      r.asset?.assetCode?.toLowerCase().includes(search.toLowerCase()) ||
-      r.requestedBy?.toLowerCase().includes(search.toLowerCase()) ||
-      r.issueDescription?.toLowerCase().includes(search.toLowerCase());
+      r.asset?.name?.toLowerCase().includes(q) ||
+      r.asset?.assetCode?.toLowerCase().includes(q) ||
+      r.requestedBy?.toLowerCase().includes(q) ||
+      r.issueDescription?.toLowerCase().includes(q) ||
+      r.ultraViewId?.toLowerCase().includes(q);
 
     const statusMatch = statusFilter === 'ALL' || r.status === statusFilter;
     const priorityMatch = priorityFilter === 'ALL' || r.priority === priorityFilter;
@@ -435,11 +446,38 @@ export default function Maintenance() {
             <h1 className="text-2xl font-bold text-slate-900">Báo Hỏng & Sửa Chữa Thiết Bị</h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Khoa/Phòng báo hỏng ➔ Điều phối về **Khoa Dược / Tổ CNTT / Phòng TCHC** ➔ Xử lý & Báo cáo định kỳ
+            Khoa/Phòng báo hỏng ➔ Điều phối về <strong className="text-slate-700 font-semibold">Khoa Dược / Tổ CNTT / Phòng TCHC</strong> ➔ Xử lý &amp; Báo cáo định kỳ
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {user?.role === 'ADMIN' ? (
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              title="Cài đặt Bot Telegram thông báo báo hỏng & sửa chữa"
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition cursor-pointer ${
+                telegramActive
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                  : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              <span>{telegramActive ? 'Telegram: Bật' : 'Cài đặt Telegram'}</span>
+            </button>
+          ) : telegramActive !== null ? (
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border ${
+                telegramActive
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-500'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${telegramActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+              <span>{telegramActive ? 'Telegram: Đang bật' : 'Telegram: Chưa bật'}</span>
+            </span>
+          ) : null}
+
           <button
             onClick={() => setShowExportModal(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 shadow-sm transition cursor-pointer"
@@ -460,48 +498,101 @@ export default function Maintenance() {
             {activeTab === 'REPORT' ? 'Quay lại danh sách' : 'Báo Cáo Tháng / Quý / Năm'}
           </button>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Báo Hỏng / Sửa Chữa Mới
-          </button>
+          {user?.role !== 'VIEWER' && (
+            <button
+              onClick={() => {
+                setCreateInitialAssetId(null);
+                setShowCreateModal(true);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Báo Hỏng / Sửa Chữa Mới
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 2. STATS CARDS (Tổng số thiết bị hỏng / sửa chữa) */}
+      {/* 2. VISUAL STATUS STEPPER & SUMMARY CARDS */}
       <div className="print:hidden grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tổng thiết bị hỏng</div>
-          <div className="text-xl font-bold text-slate-900 mt-1">
-            {distinctAssetsCount} <span className="text-xs font-normal text-slate-500">thiết bị</span>
+        <button
+          type="button"
+          onClick={() => { setActiveTab('LIST'); setStatusFilter('ALL'); }}
+          className={`text-left bg-white p-3.5 rounded-2xl border shadow-xs transition cursor-pointer ${
+            statusFilter === 'ALL'
+              ? 'border-blue-600 ring-1 ring-blue-500/30'
+              : 'border-slate-200/80 hover:border-slate-300'
+          }`}
+        >
+          <div className="text-[11px] font-heading font-semibold text-slate-500">Tổng thiết bị hỏng</div>
+          <div className="font-heading text-xl font-bold text-slate-900 tabular-nums mt-1">
+            {distinctAssetsCount} <span className="text-xs font-normal text-slate-400">thiết bị</span>
           </div>
-        </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Toàn bộ danh sách</div>
+        </button>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-xs">
-          <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Chờ tiếp nhận</div>
-          <div className="text-xl font-bold text-amber-800 mt-1">
+        <button
+          type="button"
+          onClick={() => { setActiveTab('LIST'); setStatusFilter(statusFilter === 'PENDING' ? 'ALL' : 'PENDING'); }}
+          className={`text-left bg-white p-3.5 rounded-2xl border border-l-4 border-l-amber-500 shadow-xs transition cursor-pointer ${
+            statusFilter === 'PENDING'
+              ? 'border-amber-500 ring-1 ring-amber-400/40 bg-amber-50/30'
+              : 'border-slate-200/80 hover:border-amber-300'
+          }`}
+        >
+          <div className="flex items-center justify-between text-[11px] font-heading font-semibold text-amber-700">
+            <span>1. Chờ tiếp nhận</span>
+            <Clock className="w-3.5 h-3.5" />
+          </div>
+          <div className="font-heading text-xl font-bold text-amber-800 tabular-nums mt-1">
             {distinctPendingCount} <span className="text-xs font-normal text-amber-600">thiết bị</span>
           </div>
-        </div>
+          <div className="text-[11px] text-amber-700/80 mt-0.5">Bấm để lọc nhanh →</div>
+        </button>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-blue-200 bg-blue-50/40 shadow-xs">
-          <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Đang xử lý</div>
-          <div className="text-xl font-bold text-blue-800 mt-1">
+        <button
+          type="button"
+          onClick={() => { setActiveTab('LIST'); setStatusFilter(statusFilter === 'IN_PROGRESS' ? 'ALL' : 'IN_PROGRESS'); }}
+          className={`text-left bg-white p-3.5 rounded-2xl border border-l-4 border-l-blue-600 shadow-xs transition cursor-pointer ${
+            statusFilter === 'IN_PROGRESS'
+              ? 'border-blue-600 ring-1 ring-blue-500/40 bg-blue-50/30'
+              : 'border-slate-200/80 hover:border-blue-300'
+          }`}
+        >
+          <div className="flex items-center justify-between text-[11px] font-heading font-semibold text-blue-700">
+            <span>2. Đang xử lý</span>
+            <Wrench className="w-3.5 h-3.5" />
+          </div>
+          <div className="font-heading text-xl font-bold text-blue-800 tabular-nums mt-1">
             {distinctInProgressCount} <span className="text-xs font-normal text-blue-600">thiết bị</span>
           </div>
-        </div>
+          <div className="text-[11px] text-blue-700/80 mt-0.5">Đang sửa chữa →</div>
+        </button>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/40 shadow-xs">
-          <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Đã hoàn thành</div>
-          <div className="text-xl font-bold text-emerald-800 mt-1">
+        <button
+          type="button"
+          onClick={() => { setActiveTab('LIST'); setStatusFilter(statusFilter === 'COMPLETED' ? 'ALL' : 'COMPLETED'); }}
+          className={`text-left bg-white p-3.5 rounded-2xl border border-l-4 border-l-emerald-600 shadow-xs transition cursor-pointer ${
+            statusFilter === 'COMPLETED'
+              ? 'border-emerald-600 ring-1 ring-emerald-500/40 bg-emerald-50/30'
+              : 'border-slate-200/80 hover:border-emerald-300'
+          }`}
+        >
+          <div className="flex items-center justify-between text-[11px] font-heading font-semibold text-emerald-700">
+            <span>3. Đã hoàn thành</span>
+            <CheckCircle className="w-3.5 h-3.5" />
+          </div>
+          <div className="font-heading text-xl font-bold text-emerald-800 tabular-nums mt-1">
             {distinctCompletedCount} <span className="text-xs font-normal text-emerald-600">thiết bị</span>
           </div>
-        </div>
+          <div className="text-[11px] text-emerald-700/80 mt-0.5">Đã nghiệm thu →</div>
+        </button>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-xs col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Tổng kinh phí</div>
-          <div className="text-sm font-bold text-purple-900 mt-1.5">{Number(totalCost).toLocaleString('vi-VN')} đ</div>
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs col-span-2 sm:col-span-1">
+          <div className="text-[11px] font-heading font-semibold text-slate-500">Tổng kinh phí</div>
+          <div className="font-heading text-base font-bold text-slate-900 tabular-nums mt-1.5">
+            {Number(totalCost).toLocaleString('vi-VN')} đ
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Cộng dồn tất cả phiếu</div>
         </div>
       </div>
 
@@ -509,9 +600,9 @@ export default function Maintenance() {
       {/* 3. TAB 1: DANH SÁCH YÊU CẦU BÁO HỎNG & TIẾP NHẬN XỬ LÝ                     */}
       {/* ========================================================================= */}
       {activeTab === 'LIST' && (
-        <div className="print:hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="print:hidden space-y-3">
           {/* Filters bar */}
-          <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+          <div className="p-4 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={unitFilter}
@@ -563,131 +654,212 @@ export default function Maintenance() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600 font-bold uppercase border-b border-slate-200">
-                <tr>
-                  <th className="p-3.5">Mã TB</th>
-                  <th className="p-3.5 min-w-[160px]">Tên thiết bị</th>
-                  <th className="p-3.5">Khoa / Phòng yêu cầu</th>
-                  <th className="p-3.5">Người báo & SĐT</th>
-                  <th className="p-3.5">Đơn vị nhận</th>
-                  <th className="p-3.5 min-w-[180px]">Mô tả sự cố & Vị trí</th>
-                  <th className="p-3.5">Ưu tiên</th>
-                  <th className="p-3.5">Trạng thái</th>
-                  <th className="p-3.5 text-right">Chi phí (đ)</th>
-                  <th className="p-3.5 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={10} className="text-center py-12 text-slate-400">Đang tải danh sách...</td></tr>
-                ) : filteredRequests.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-12 text-slate-400">Chưa có phiếu báo hỏng nào phù hợp.</td></tr>
-                ) : (
-                  filteredRequests.map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3.5 font-mono font-bold text-blue-700">{r.asset?.assetCode || 'N/A'}</td>
-                      <td className="p-3.5">
-                        <div className="font-bold text-slate-900">{r.asset?.name || (r as any).assetName || 'Thiết bị'}</div>
-                        {r.asset?.assignedTo && (
-                          <div className="text-[11px] text-amber-800 font-medium mt-0.5">
-                            👤 Người SD: <span className="font-bold">{r.asset.assignedTo}</span>
+          <DataTableShell
+            title="Danh sách yêu cầu bảo trì & sửa chữa"
+            totalCount={filteredRequests.length}
+            countLabel="phiếu"
+            density={density}
+            onDensityChange={setDensity}
+            loading={loading}
+            isEmpty={filteredRequests.length === 0}
+            emptyMessage="Chưa có phiếu báo hỏng nào phù hợp."
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                  <tr>
+                    <th className={`${headPy} px-3.5 w-28 whitespace-nowrap`}>Mã TB</th>
+                    <th className={`${headPy} px-3.5 min-w-[250px] whitespace-nowrap`}>Thiết bị &amp; Sự cố</th>
+                    <th className={`${headPy} px-3.5 whitespace-nowrap`}>Khoa báo &amp; Người LH</th>
+                    <th className={`${headPy} px-3.5 text-right whitespace-nowrap`}>Đơn vị &amp; Chi phí</th>
+                    <th className={`${headPy} px-3.5 whitespace-nowrap`}>Trạng thái</th>
+                    <th className={`${headPy} px-3.5 w-32 text-right whitespace-nowrap`}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {!loading &&
+                    filteredRequests.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50/75 transition-colors">
+                        <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 font-mono text-[11px] font-medium text-blue-700">
+                            {r.asset?.assetCode || 'N/A'}
+                          </span>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top max-w-[340px]`}>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-heading font-semibold text-slate-800 leading-snug break-words">
+                              {r.asset?.name || (r as any).assetName || 'Thiết bị'}
+                            </span>
+                            {r.issueType === 'SOFTWARE' && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[10px] font-semibold whitespace-nowrap">
+                                <Laptop className="w-2.5 h-2.5" /> Phần mềm
+                              </span>
+                            )}
                           </div>
-                        )}
-                        {r.asset?.specifications && (
-                          <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">{r.asset.specifications}</div>
-                        )}
-                      </td>
-                      <td className="p-3.5 text-slate-700 font-medium">{r.department?.name || 'CDC'}</td>
-                      <td className="p-3.5">
-                        <div className="font-semibold text-slate-800">{r.requestedBy}</div>
-                        {r.contactPhone && <div className="text-[11px] text-slate-500 font-mono">{r.contactPhone}</div>}
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          (r as any).managingUnit === 'DUOC' ? 'bg-emerald-100 text-emerald-800' :
-                          (r as any).managingUnit === 'CNTT' ? 'bg-blue-100 text-blue-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
-                          {(r as any).managingUnit === 'DUOC' ? 'Khoa Dược' :
-                           (r as any).managingUnit === 'CNTT' ? 'Tổ CNTT' : 'Phòng TCHC'}
-                        </span>
-                      </td>
-                      <td className="p-3.5 max-w-xs">
-                        <div className="text-slate-900 font-medium line-clamp-2">{r.issueDescription}</div>
-                        {r.locationDetail && <div className="text-[10px] text-slate-500 italic mt-0.5">Vị trí: {r.locationDetail}</div>}
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          r.priority === 'URGENT' ? 'bg-red-100 text-red-800' :
-                          r.priority === 'HIGH' ? 'bg-orange-100 text-orange-800' :
-                          r.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-slate-100 text-slate-700'
-                        }`}>
-                          {PRIORITY_LABELS[r.priority] || r.priority}
-                        </span>
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          r.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                          r.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-                          r.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
-                          {r.status === 'COMPLETED' ? 'Đã hoàn thành' :
-                           r.status === 'IN_PROGRESS' ? 'Đang xử lý' :
-                           r.status === 'REJECTED' ? 'Từ chối' : 'Chờ tiếp nhận'}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-right font-mono font-bold text-slate-800">
-                        {r.repairCost ? Number(r.repairCost).toLocaleString('vi-VN') : '-'}
-                      </td>
-                      <td className="p-3.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenDetail(r, 'PROPOSAL')}
-                            className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg transition cursor-pointer"
-                            title="Xem chi tiết thiết bị & sự cố"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenDetail(r, 'ACCEPTANCE')}
-                            className="p-1.5 bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white rounded-lg transition cursor-pointer"
-                            title="In phiếu đề xuất / nghiệm thu sửa chữa (A4)"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenEdit(r)}
-                            className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg transition cursor-pointer"
-                            title="Chỉnh sửa toàn bộ nội dung phiếu"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenProcess(r)}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 rounded-lg text-xs font-bold transition cursor-pointer"
-                            title="Tiếp nhận & Cập nhật tiến độ"
-                          >
-                            Xử lý
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRequest(r.id)}
-                            className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition cursor-pointer"
-                            title="Xóa phiếu báo hỏng / sửa chữa"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                          <p className="mt-0.5 text-[11px] text-slate-600 line-clamp-2 leading-snug break-words">
+                            {r.issueDescription}
+                          </p>
+                          {(r.ultraViewId || parseAttachments(r.attachments).length > 0) && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              {r.ultraViewId && (
+                                <button
+                                  type="button"
+                                  onClick={() => copyText(r.ultraViewId!, 'ID UltraViewer')}
+                                  title="Bấm để sao chép ID UltraViewer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 font-mono text-[10px] font-semibold cursor-pointer transition"
+                                >
+                                  <Laptop className="w-2.5 h-2.5 shrink-0" />
+                                  <span>UV: {r.ultraViewId}{r.ultraViewPass ? ` / ${r.ultraViewPass}` : ''}</span>
+                                  <Copy className="w-2.5 h-2.5 opacity-70" />
+                                </button>
+                              )}
+                              {parseAttachments(r.attachments).length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenDetail(r, 'PROPOSAL')}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10px] font-medium cursor-pointer transition"
+                                >
+                                  <Camera className="w-2.5 h-2.5" />
+                                  <span>{parseAttachments(r.attachments).length} ảnh</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500">
+                            {r.asset?.assignedTo && (
+                              <span className="inline-flex items-center gap-1 text-amber-700 font-medium truncate max-w-[160px]">
+                                <User className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{r.asset.assignedTo}</span>
+                              </span>
+                            )}
+                            {r.locationDetail && (
+                              <span className="inline-flex items-center gap-1 truncate max-w-[160px]">
+                                <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="truncate">{r.locationDetail}</span>
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top max-w-[220px]`}>
+                          <div className="font-medium text-slate-800 truncate">{r.department?.name || 'CDC'}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
+                            <span className="inline-flex items-center gap-1 truncate max-w-[140px]">
+                              <User className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{r.requestedBy}</span>
+                            </span>
+                            {r.contactPhone && (
+                              <span className="inline-flex items-center gap-1 font-mono text-[10px]">
+                                <Phone className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                <span>{r.contactPhone}</span>
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top text-right whitespace-nowrap`}>
+                          <div>
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${
+                                (r as any).managingUnit === 'DUOC'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                  : (r as any).managingUnit === 'CNTT'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200/70'
+                              }`}
+                            >
+                              {(r as any).managingUnit === 'DUOC'
+                                ? 'Khoa Dược'
+                                : (r as any).managingUnit === 'CNTT'
+                                  ? 'Tổ CNTT'
+                                  : 'Phòng TCHC'}
+                            </span>
+                          </div>
+                          <div className="mt-1 font-sans font-semibold text-slate-800 tabular-nums">
+                            {r.repairCost ? `${Number(r.repairCost).toLocaleString('vi-VN')} đ` : '—'}
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                          <div>
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                                r.status === 'COMPLETED'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                  : r.status === 'IN_PROGRESS'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                    : r.status === 'REJECTED'
+                                      ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                                      : 'bg-amber-50 text-amber-800 border border-amber-200/70'
+                              }`}
+                            >
+                              {r.status === 'COMPLETED'
+                                ? 'Đã hoàn thành'
+                                : r.status === 'IN_PROGRESS'
+                                  ? 'Đang xử lý'
+                                  : r.status === 'REJECTED'
+                                    ? 'Từ chối'
+                                    : 'Chờ tiếp nhận'}
+                            </span>
+                          </div>
+                          <div className="mt-1">
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium whitespace-nowrap ${
+                                r.priority === 'URGENT'
+                                  ? 'bg-rose-50 text-rose-700'
+                                  : r.priority === 'HIGH'
+                                    ? 'bg-orange-50 text-orange-700'
+                                    : r.priority === 'MEDIUM'
+                                      ? 'bg-amber-50 text-amber-700'
+                                      : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {PRIORITY_LABELS[r.priority] || r.priority}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className={`${cellPy} px-3.5 align-top text-right whitespace-nowrap`}>
+                          <RowActionMenu
+                            primary={{
+                              label: 'Xử lý',
+                              title: 'Tiếp nhận & Cập nhật tiến độ',
+                              icon: <Wrench className="w-3.5 h-3.5" />,
+                              onClick: () => handleOpenProcess(r),
+                              tone: 'amber',
+                            }}
+                            items={[
+                              {
+                                label: 'Xem chi tiết',
+                                icon: <Eye className="w-3.5 h-3.5" />,
+                                onClick: () => handleOpenDetail(r, 'PROPOSAL'),
+                              },
+                              {
+                                label: 'In phiếu (A4)',
+                                icon: <Printer className="w-3.5 h-3.5" />,
+                                onClick: () => handleOpenDetail(r, 'ACCEPTANCE'),
+                              },
+                              {
+                                label: 'Chỉnh sửa phiếu',
+                                icon: <Edit3 className="w-3.5 h-3.5" />,
+                                onClick: () => handleOpenEdit(r),
+                              },
+                              {
+                                label: 'Xóa phiếu',
+                                icon: <Trash2 className="w-3.5 h-3.5" />,
+                                onClick: () => handleDeleteRequest(r.id),
+                                danger: true,
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </DataTableShell>
         </div>
       )}
 
@@ -935,315 +1107,20 @@ export default function Maintenance() {
       {/* ========================================================================= */}
       {/* MODAL 1: TẠO YÊU CẦU BÁO HỎNG / SỬA CHỮA MỚI (KHOA / PHÒNG GỬI)            */}
       {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6 space-y-4 max-h-[92vh] overflow-y-auto border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-bold text-base text-slate-900">Phiếu Báo Hỏng & Đề Nghị Sửa Chữa Thiết Bị</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Khoa/Phòng gửi trực tiếp đến đơn vị kỹ thuật phụ trách</p>
-              </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer">✕</button>
-            </div>
-
-            <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
-              {/* Row 1: Khoa/Phòng + Khối Tiếp Nhận */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Khoa / Phòng yêu cầu (*)</label>
-                  {user?.role === 'DEPARTMENT' ? (
-                    <div className="p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-800 flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-blue-600" />
-                      <span>{user.fullName || departments.find(d => d.id === user.departmentId)?.name || 'Khoa / Phòng của bạn'}</span>
-                    </div>
-                  ) : (
-                    <select
-                      required
-                      value={formData.departmentId}
-                      onChange={e => setFormData({ ...formData, departmentId: e.target.value, assetId: '' })}
-                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none font-medium text-xs"
-                    >
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id}>{d.code} - {d.name}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Loại thiết bị / Đơn vị tiếp nhận (*)</label>
-                  <select
-                    required
-                    value={formData.managingUnit}
-                    onChange={e => setFormData({ ...formData, managingUnit: e.target.value, assetId: '' })}
-                    className="w-full p-2.5 border border-slate-300 rounded-xl bg-blue-50/70 text-blue-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none text-xs"
-                  >
-                    <option value="ALL">📋 Tất cả tài sản của Khoa (CNTT, Dược TBYT, TCHC)</option>
-                    <option value="CNTT">💻 Thiết bị CNTT (Tổ CNTT tiếp nhận)</option>
-                    <option value="DUOC">🩺 Trang thiết bị Y tế (Khoa Dược tiếp nhận)</option>
-                    <option value="TCHC">🏢 Cơ sở vật chất & Tòa nhà (Phòng TCHC tiếp nhận)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 2: Chọn thiết bị dạng BẢNG CHIA CỘT RÕ RÀNG */}
-              <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <label className="font-bold text-slate-700 uppercase flex items-center gap-1.5">
-                    <span>Chọn thiết bị hư hỏng (*):</span>
-                    {selectedCreateAsset && (
-                      <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold rounded-md text-[11px] border border-emerald-300 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Đã chọn: [{selectedCreateAsset.assetCode}] {selectedCreateAsset.name}</span>
-                      </span>
-                    )}
-                  </label>
-                  <span className="text-[11px] text-blue-600 font-semibold">({departmentAssets.length} thiết bị phù hợp)</span>
-                </div>
-
-                {/* Quick Category Filter Pills */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, managingUnit: 'ALL' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
-                      formData.managingUnit === 'ALL'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    Tất cả
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, managingUnit: 'CNTT' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
-                      formData.managingUnit === 'CNTT'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                    }`}
-                  >
-                    💻 Tổ CNTT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, managingUnit: 'DUOC' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
-                      formData.managingUnit === 'DUOC'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                    }`}
-                  >
-                    🩺 Khoa Dược (TBYT)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, managingUnit: 'TCHC' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
-                      formData.managingUnit === 'TCHC'
-                        ? 'bg-amber-600 text-white shadow-xs'
-                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
-                    }`}
-                  >
-                    🏢 Phòng TCHC
-                  </button>
-                </div>
-
-                {/* Quick Search */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Tìm nhanh theo mã tài sản, tên thiết bị, người sử dụng, phòng máy..."
-                    value={createAssetSearch}
-                    onChange={e => setCreateAssetSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-xl bg-white text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Bảng chia cột danh sách thiết bị */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
-                  <div className="max-h-60 overflow-y-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-100/90 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
-                        <tr>
-                          <th className="p-2.5 text-center w-12">Chọn</th>
-                          <th className="p-2.5 w-32">Mã tài sản</th>
-                          <th className="p-2.5">Tên thiết bị</th>
-                          <th className="p-2.5 w-44">Người sử dụng</th>
-                          <th className="p-2.5 w-36">Vị trí phòng máy</th>
-                          <th className="p-2.5 w-20 text-center">Năm SD</th>
-                          <th className="p-2.5 w-28 text-center">Đơn vị</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {departmentAssets.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="p-6 text-center text-slate-400 text-xs">
-                              Không tìm thấy thiết bị nào phù hợp trong danh mục của Khoa.
-                            </td>
-                          </tr>
-                        ) : (
-                          departmentAssets.map(a => {
-                            const isSelected = formData.assetId === a.id.toString();
-                            return (
-                              <tr
-                                key={a.id}
-                                onClick={() => {
-                                  setFormData({
-                                    ...formData,
-                                    assetId: a.id.toString(),
-                                    locationDetail: a.locationDetail || formData.locationDetail,
-                                    managingUnit: (a as any).managingUnit || (a.categoryId === 2 ? 'CNTT' : a.categoryId === 1 ? 'DUOC' : 'TCHC'),
-                                    requestedBy: formData.requestedBy || a.assignedTo || user?.fullName || ''
-                                  });
-                                }}
-                                className={`transition cursor-pointer select-none ${
-                                  isSelected 
-                                    ? 'bg-blue-50/95 font-medium text-blue-900 border-l-4 border-blue-600' 
-                                    : 'hover:bg-slate-50/80 text-slate-700'
-                                }`}
-                              >
-                                <td className="p-2.5 text-center align-middle">
-                                  {isSelected ? (
-                                    <CheckCircle2 className="w-4 h-4 text-blue-600 fill-blue-100 mx-auto" />
-                                  ) : (
-                                    <div className="w-4 h-4 rounded-full border-2 border-slate-300 mx-auto" />
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="font-mono font-bold text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded text-[11px] border border-blue-200 inline-block">
-                                    {a.assetCode}
-                                  </span>
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <div className="font-bold text-slate-900">{a.name}</div>
-                                  {a.specifications && (
-                                    <div className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5">{a.specifications}</div>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  {a.assignedTo ? (
-                                    <span className="font-semibold text-slate-800 flex items-center gap-1">
-                                      <span>👤</span> <span>{a.assignedTo}</span>
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 italic">Chưa gán</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="text-slate-700 flex items-center gap-1">
-                                    <span>📍</span> <span>{a.locationDetail || (a as any).floor || 'Tại khoa'}</span>
-                                  </span>
-                                </td>
-                                <td className="p-2.5 text-center align-middle font-mono text-slate-600">
-                                  {a.yearInUse || '-'}
-                                </td>
-                                <td className="p-2.5 text-center align-middle">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    (a as any).managingUnit === 'DUOC' ? 'bg-emerald-100 text-emerald-800' :
-                                    (a as any).managingUnit === 'CNTT' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {(a as any).managingUnit === 'DUOC' ? 'Khoa Dược' : (a as any).managingUnit === 'CNTT' ? 'Tổ CNTT' : 'TCHC'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 3: Người báo hỏng + SĐT */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Họ tên người báo hỏng (*)</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ví dụ: BS. Nguyễn Văn A..."
-                    value={formData.requestedBy}
-                    onChange={e => setFormData({ ...formData, requestedBy: e.target.value })}
-                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Số điện thoại liên hệ</label>
-                  <input
-                    type="text"
-                    placeholder="0905 xxx xxx"
-                    value={formData.contactPhone}
-                    onChange={e => setFormData({ ...formData, contactPhone: e.target.value })}
-                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Row 4: Vị trí cụ thể + Mức độ ưu tiên */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Vị trí phòng máy cụ thể</label>
-                  <input
-                    type="text"
-                    placeholder="Phòng 204 (Tầng 2), Khu xét nghiệm..."
-                    value={formData.locationDetail}
-                    onChange={e => setFormData({ ...formData, locationDetail: e.target.value })}
-                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Mức độ ưu tiên (*)</label>
-                  <select
-                    value={formData.priority}
-                    onChange={e => setFormData({ ...formData, priority: e.target.value })}
-                    className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                  >
-                    <option value="LOW">Thấp (Có thể chờ lịch bảo trì)</option>
-                    <option value="MEDIUM">Trung bình (Ảnh hưởng công việc thông thường)</option>
-                    <option value="HIGH">Cao (Máy phục vụ tiếp đón / khám bệnh)</option>
-                    <option value="URGENT">Khẩn cấp (Ngừng trệ xét nghiệm / cấp cứu)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 5: Mô tả sự cố */}
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Mô tả chi tiết tình trạng hư hỏng (*)</label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder="Mô tả cụ thể: Không lên nguồn, quạt kêu to, kẹt giấy, màn hình sọc, máy xét nghiệm báo lỗi cảm biến..."
-                  value={formData.issueDescription}
-                  onChange={e => setFormData({ ...formData, issueDescription: e.target.value })}
-                  className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Wrench className="w-3.5 h-3.5" /> Gửi Yêu Cầu Sửa Chữa
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreateMaintenanceModal
+        open={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setCreateInitialAssetId(null);
+        }}
+        onSuccess={loadData}
+        user={user}
+        assets={assets}
+        departments={departments}
+        initialAssetId={createInitialAssetId}
+        telegramActive={telegramActive}
+        onGoScanQr={() => navigate('/qr-scanner')}
+      />
 
       {/* ========================================================================= */}
       {/* MODAL 2: TIẾP NHẬN & XỬ LÝ SỬA CHỮA (KỸ THUẬT VIÊN / QUẢN LÝ)             */}
@@ -1260,10 +1137,75 @@ export default function Maintenance() {
             </div>
 
             {/* Request Summary Box */}
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5 text-slate-700">
-              <div><strong>Khoa/Phòng:</strong> {selectedRequest.department?.name}</div>
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-2 text-slate-700">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><strong>Khoa/Phòng:</strong> {selectedRequest.department?.name}</div>
+                {selectedRequest.issueType === 'SOFTWARE' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[11px] font-bold">
+                    <Laptop className="w-3 h-3" /> Lỗi phần mềm / Hỗ trợ từ xa
+                  </span>
+                )}
+              </div>
               <div><strong>Người báo hỏng:</strong> {selectedRequest.requestedBy} {selectedRequest.contactPhone ? `(${selectedRequest.contactPhone})` : ''}</div>
               <div><strong>Hiện trạng sự cố:</strong> <span className="text-red-700 font-medium">{selectedRequest.issueDescription}</span></div>
+
+              {selectedRequest.ultraViewId && (
+                <div className="mt-2 p-2.5 rounded-xl bg-blue-50 border border-blue-200 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-1 font-bold text-blue-900">
+                      <Laptop className="w-3.5 h-3.5" /> UltraViewer:
+                    </span>
+                    <span className="font-mono font-bold text-blue-800 bg-white px-2 py-0.5 rounded border border-blue-200">
+                      ID: {selectedRequest.ultraViewId}
+                    </span>
+                    {selectedRequest.ultraViewPass && (
+                      <span className="font-mono font-bold text-blue-800 bg-white px-2 py-0.5 rounded border border-blue-200">
+                        MK: {selectedRequest.ultraViewPass}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => copyText(selectedRequest.ultraViewId!, 'ID UltraViewer')}
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" /> Copy ID
+                    </button>
+                    {selectedRequest.ultraViewPass && (
+                      <button
+                        type="button"
+                        onClick={() => copyText(selectedRequest.ultraViewPass!, 'Mật khẩu UltraViewer')}
+                        className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <KeyRound className="w-3 h-3" /> Copy MK
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {parseAttachments(selectedRequest.attachments).length > 0 && (
+                <div className="pt-1">
+                  <div className="text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
+                    <ImageIcon className="w-3.5 h-3.5" /> Ảnh hiện trạng đính kèm:
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {parseAttachments(selectedRequest.attachments).map((url, idx) => (
+                      <a
+                        key={idx}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-lg overflow-hidden border border-slate-200 bg-white aspect-video hover:opacity-90 transition"
+                        title="Bấm để xem ảnh phóng to"
+                      >
+                        <img src={url} alt={`Ảnh sự cố ${idx + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleProcessSubmit} className="space-y-3.5 text-xs">
@@ -1681,100 +1623,23 @@ export default function Maintenance() {
                 </div>
 
                 {/* Bảng chia cột danh sách thiết bị chỉnh sửa */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
-                  <div className="max-h-60 overflow-y-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-100/90 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
-                        <tr>
-                          <th className="p-2.5 text-center w-12">Chọn</th>
-                          <th className="p-2.5 w-32">Mã tài sản</th>
-                          <th className="p-2.5">Tên thiết bị</th>
-                          <th className="p-2.5 w-44">Người sử dụng</th>
-                          <th className="p-2.5 w-36">Vị trí phòng máy</th>
-                          <th className="p-2.5 w-20 text-center">Năm SD</th>
-                          <th className="p-2.5 w-28 text-center">Đơn vị</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {editDepartmentAssets.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="p-6 text-center text-slate-400 text-xs">
-                              Không tìm thấy thiết bị nào phù hợp.
-                            </td>
-                          </tr>
-                        ) : (
-                          editDepartmentAssets.map(a => {
-                            const isSelected = editData.assetId === a.id.toString();
-                            return (
-                              <tr
-                                key={a.id}
-                                onClick={() => {
-                                  setEditData({
-                                    ...editData,
-                                    assetId: a.id.toString(),
-                                    locationDetail: a.locationDetail || editData.locationDetail,
-                                    departmentId: a.departmentId ? a.departmentId.toString() : editData.departmentId,
-                                    managingUnit: (a as any).managingUnit || editData.managingUnit
-                                  });
-                                }}
-                                className={`transition cursor-pointer select-none ${
-                                  isSelected 
-                                    ? 'bg-blue-50/95 font-medium text-blue-900 border-l-4 border-blue-600' 
-                                    : 'hover:bg-slate-50/80 text-slate-700'
-                                }`}
-                              >
-                                <td className="p-2.5 text-center align-middle">
-                                  {isSelected ? (
-                                    <CheckCircle2 className="w-4 h-4 text-blue-600 fill-blue-100 mx-auto" />
-                                  ) : (
-                                    <div className="w-4 h-4 rounded-full border-2 border-slate-300 mx-auto" />
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="font-mono font-bold text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded text-[11px] border border-blue-200 inline-block">
-                                    {a.assetCode}
-                                  </span>
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <div className="font-bold text-slate-900">{a.name}</div>
-                                  {a.specifications && (
-                                    <div className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5">{a.specifications}</div>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  {a.assignedTo ? (
-                                    <span className="font-semibold text-slate-800 flex items-center gap-1">
-                                      <span>👤</span> <span>{a.assignedTo}</span>
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 italic">Chưa gán</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 align-middle">
-                                  <span className="text-slate-700 flex items-center gap-1">
-                                    <span>📍</span> <span>{a.locationDetail || (a as any).floor || 'Tại khoa'}</span>
-                                  </span>
-                                </td>
-                                <td className="p-2.5 text-center align-middle font-mono text-slate-600">
-                                  {a.yearInUse || '-'}
-                                </td>
-                                <td className="p-2.5 text-center align-middle">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    (a as any).managingUnit === 'DUOC' ? 'bg-emerald-100 text-emerald-800' :
-                                    (a as any).managingUnit === 'CNTT' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {(a as any).managingUnit === 'DUOC' ? 'Khoa Dược' : (a as any).managingUnit === 'CNTT' ? 'Tổ CNTT' : 'TCHC'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <AssetPickerTable
+                  mode="single"
+                  assets={editDepartmentAssets}
+                  selectedId={editData.assetId}
+                  showDepartment={false}
+                  accentColor="blue"
+                  emptyMessage="Không tìm thấy thiết bị nào phù hợp."
+                  onSelect={(a) => {
+                    setEditData({
+                      ...editData,
+                      assetId: a.id.toString(),
+                      locationDetail: a.locationDetail || editData.locationDetail,
+                      departmentId: a.departmentId ? a.departmentId.toString() : editData.departmentId,
+                      managingUnit: (a as any).managingUnit || editData.managingUnit,
+                    });
+                  }}
+                />
               </div>
 
               {/* Row 3: Người báo & SĐT */}
@@ -1845,6 +1710,42 @@ export default function Maintenance() {
                     <option value="COMPLETED">Đã hoàn thành</option>
                     <option value="REJECTED">Từ chối</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Phân loại lỗi & UltraViewer */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Phân loại sự cố</label>
+                  <select
+                    value={editData.issueType || 'HARDWARE'}
+                    onChange={e => setEditData({ ...editData, issueType: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                  >
+                    <option value="HARDWARE">🔧 Lỗi phần cứng / Thiết bị</option>
+                    <option value="SOFTWARE">💻 Lỗi phần mềm / Hỗ trợ từ xa</option>
+                    <option value="OTHER">📋 Sự cố / Yêu cầu khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">ID UltraViewer</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 12 345 678"
+                    value={editData.ultraViewId || ''}
+                    onChange={e => setEditData({ ...editData, ultraViewId: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Mật khẩu UltraViewer</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 4829"
+                    value={editData.ultraViewPass || ''}
+                    onChange={e => setEditData({ ...editData, ultraViewPass: e.target.value })}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
                 </div>
               </div>
 
@@ -2220,16 +2121,59 @@ export default function Maintenance() {
                     </div>
 
                     {/* Phần III: Hiện trạng sự cố */}
-                    <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200">
-                      <div className="font-bold text-amber-900 uppercase text-[11px] mb-2">
-                        III. HIỆN TRẠNG SỰ CỐ & MÔ TẢ HỎNG HÓC
+                    <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 space-y-2">
+                      <div className="font-bold text-amber-900 uppercase text-[11px]">
+                        III. HIỆN TRẠNG SỰ CỐ &amp; MÔ TẢ HỎNG HÓC
                       </div>
                       <div className="p-2.5 bg-white rounded-lg border border-amber-200 text-slate-800 font-medium">
                         {detailRequest.issueDescription}
                       </div>
-                      <div className="mt-2 text-slate-600">
-                        • Mức độ ưu tiên xử lý: <b className="text-amber-800">{PRIORITY_LABELS[detailRequest.priority] || detailRequest.priority}</b>
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-slate-700">
+                        <div>
+                          • Phân loại sự cố:{' '}
+                          <b>
+                            {detailRequest.issueType === 'SOFTWARE'
+                              ? 'Lỗi phần mềm / Hỗ trợ từ xa'
+                              : detailRequest.issueType === 'OTHER'
+                              ? 'Sự cố khác'
+                              : 'Lỗi phần cứng / Thiết bị'}
+                          </b>
+                        </div>
+                        <div>
+                          • Mức độ ưu tiên xử lý:{' '}
+                          <b className="text-amber-800">{PRIORITY_LABELS[detailRequest.priority] || detailRequest.priority}</b>
+                        </div>
                       </div>
+                      {detailRequest.ultraViewId && (
+                        <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 flex flex-wrap items-center gap-3">
+                          <span>
+                            • UltraViewer ID: <b className="font-mono">{detailRequest.ultraViewId}</b>
+                          </span>
+                          {detailRequest.ultraViewPass && (
+                            <span>
+                              | Mật khẩu: <b className="font-mono">{detailRequest.ultraViewPass}</b>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {parseAttachments(detailRequest.attachments).length > 0 && (
+                        <div className="print:hidden pt-1">
+                          <div className="text-[11px] font-semibold text-slate-600 mb-1.5">Ảnh hiện trạng đính kèm:</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {parseAttachments(detailRequest.attachments).map((url, idx) => (
+                              <a
+                                key={idx}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block rounded-lg overflow-hidden border border-slate-200 bg-white aspect-video hover:opacity-90"
+                              >
+                                <img src={url} alt={`Ảnh sự cố ${idx + 1}`} className="w-full h-full object-cover" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

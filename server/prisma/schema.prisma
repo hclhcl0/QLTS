@@ -63,8 +63,9 @@ model Asset {
   specifications    String?   // Cấu hình / thông số kỹ thuật
   status            String    @default("DANG_SU_DUNG") // DANG_SU_DUNG, HONG, KHONG_SU_DUNG, CHO_THANH_LY, DA_THANH_LY, BAO_TRI, CHO_PHAN_BO
   managingUnit      String?   @default("TCHC") // TCHC, DUOC, CNTT
-  floor             String?   // Tầng Hầm, Tầng 1 .. Tầng 7
-  buildingAsset     Int?      @default(0) // 1 if building infrastructure asset, 0 otherwise
+  floor             String?   // Tầng Hầm, Tầng 1 .. Tầng 7, Tầng Mái, Khối phụ trợ (KLCTN)
+  buildingAsset     Int?      @default(0) // 1 if building M&E infrastructure asset, 0 if movable admin/dept asset
+  assetGroup        String?   // NOI_THAT, GIA_DUNG_XE, HVAC, DIEN_CS, PCCC, NUOC_VS
   bookQuantity      Int       @default(1)
   actualQuantity    Int       @default(1)
   quantityDifference Int      @default(0)
@@ -124,7 +125,11 @@ model MaintenanceRequest {
   department       Department @relation(fields: [departmentId], references: [id])
   managingUnit     String?   // DUOC, CNTT, TCHC
   locationDetail   String?   // Vị trí phòng máy cụ thể
+  issueType        String?   @default("HARDWARE") // HARDWARE, SOFTWARE, OTHER
   issueDescription String
+  ultraViewId      String?   // ID UltraViewer (hỗ trợ từ xa cho lỗi phần mềm)
+  ultraViewPass    String?   // Mật khẩu UltraViewer
+  attachments      String?   // JSON array URL ảnh hiện trạng sự cố
   priority         String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
   status           String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, REJECTED
   repairCost       Float?
@@ -265,4 +270,10 @@ model PlannedMaintenance {
   note                String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

@@ -1,14 +1,20 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRoles } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
+const requirePlannedMaintEditor = requireRoles('ADMIN', 'MANAGER_DUOC');
 
-// Chức năng Kế hoạch bảo trì định kỳ: Dành cho ADMIN, Quản lý Khoa Dược (MANAGER_DUOC), và các Khoa/Phòng (DEPARTMENT)
+// Chức năng Kế hoạch bảo trì định kỳ: Dành cho ADMIN, VIEWER (chỉ xem), Quản lý Khoa Dược (MANAGER_DUOC), và các Khoa/Phòng (DEPARTMENT)
 // Không áp dụng cho Quản lý CNTT (MANAGER_CNTT) và Quản lý TCHC (MANAGER_TCHC)
 router.use(requireAuth, (req: any, res, next) => {
-  if (req.user?.role === 'ADMIN' || req.user?.role === 'MANAGER_DUOC' || req.user?.role === 'DEPARTMENT') {
+  if (
+    req.user?.role === 'ADMIN' ||
+    req.user?.role === 'VIEWER' ||
+    req.user?.role === 'MANAGER_DUOC' ||
+    req.user?.role === 'DEPARTMENT'
+  ) {
     return next();
   }
   return res.status(403).json({ 
@@ -261,7 +267,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 // POST /api/planned-maintenance - Tạo hồ sơ bảo trì theo kế hoạch (hỗ trợ 1 thiết bị hoặc nhiều thiết bị hàng loạt)
-router.post('/', requireAuth, async (req: any, res) => {
+router.post('/', requirePlannedMaintEditor, async (req: any, res) => {
   try {
     const {
       assetId, assetIds, maintenanceDate, nextMaintenanceDate, cycleMonths, performedBy, vendor,
@@ -321,7 +327,7 @@ router.post('/', requireAuth, async (req: any, res) => {
 });
 
 // PUT /api/planned-maintenance/:id - Cập nhật hồ sơ bảo trì theo kế hoạch
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requirePlannedMaintEditor, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const {
@@ -359,7 +365,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/planned-maintenance/:id - Xóa hồ sơ bảo trì theo kế hoạch
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requirePlannedMaintEditor, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await prisma.plannedMaintenance.delete({ where: { id } });

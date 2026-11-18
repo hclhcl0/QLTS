@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Edit, Download, Printer, QrCode, Wrench, ArrowRightLeft, Award, TrendingDown, CheckCircle2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiGet } from '../lib/api';
-import { Asset, STATUS_LABELS, STATUS_COLORS } from '../types';
+import { TCHC_GROUP_META } from '../types';
+import StatusBadge from '../components/ui/StatusBadge';
 
 export default function AssetDetail() {
   const params = useParams();
@@ -45,29 +46,35 @@ export default function AssetDetail() {
   const handlePrintQR = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow || !asset) return;
+    const logoUrl = `${window.location.origin}/cdc-logo.png`;
     printWindow.document.write(`
       <html>
         <head>
           <title>Mã QR - ${asset.assetCode}</title>
           <style>
             body { font-family: sans-serif; text-align: center; padding: 20px; }
-            .label { border: 2px solid #000; padding: 15px; width: 260px; margin: 0 auto; border-radius: 8px; }
-            .title { font-size: 13px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; color: #1e40af; }
-            .code { font-size: 16px; font-weight: bold; margin-top: 5px; }
-            .name { font-size: 12px; color: #333; margin-top: 3px; }
-            .dept { font-size: 11px; color: #666; margin-top: 3px; }
-            img { width: 150px; height: 150px; margin: 5px auto; }
+            .label { border: 2px solid #024383; padding: 15px; width: 270px; margin: 0 auto; border-radius: 12px; }
+            .brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px; }
+            .brand img { width: 28px; height: 28px; border-radius: 6px; object-fit: contain; }
+            .title { font-size: 13px; font-weight: bold; text-transform: uppercase; color: #024383; }
+            .code { font-size: 16px; font-weight: bold; margin-top: 5px; font-family: monospace; }
+            .name { font-size: 12px; color: #0f172a; font-weight: 600; margin-top: 3px; }
+            .dept { font-size: 11px; color: #475569; margin-top: 3px; }
+            .qr { width: 150px; height: 150px; margin: 5px auto; display: block; }
           </style>
         </head>
         <body>
           <div class="label">
-            <div class="title">CDC ĐÀ NẴNG</div>
-            <img src="${qrCodeImg}" />
+            <div class="brand">
+              <img src="${logoUrl}" alt="CDC Đà Nẵng" />
+              <div class="title">CDC ĐÀ NẴNG</div>
+            </div>
+            <img class="qr" src="${qrCodeImg}" />
             <div class="code">${asset.assetCode}</div>
             <div class="name">${asset.name}</div>
-            <div class="dept">${asset.department?.name || ''} - ${asset.location || 'Cơ sở 1'}</div>
+            <div class="dept">${[asset.department?.name, asset.floor, asset.locationDetail, asset.location || 'Cơ sở 1'].filter(Boolean).join(' · ')}</div>
           </div>
-          <script>window.print();</script>
+          <script>window.onload=()=>setTimeout(()=>window.print(),250);</script>
         </body>
       </html>
     `);
@@ -98,30 +105,63 @@ export default function AssetDetail() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-blue-600 font-bold uppercase">{asset.assetCode}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-blue-700 font-medium bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-lg">
+                {asset.assetCode}
+              </span>
               {asset.oldAssetCode && (
-                <span className="text-[11px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md font-semibold">
+                <span className="font-mono text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg">
                   Mã TS cũ: {asset.oldAssetCode}
                 </span>
               )}
+              {asset.assetGroup && TCHC_GROUP_META[asset.assetGroup] && (
+                <span
+                  className={`px-2 py-0.5 rounded-lg text-xs font-medium border ${TCHC_GROUP_META[asset.assetGroup].badgeClass}`}
+                >
+                  {TCHC_GROUP_META[asset.assetGroup].label}
+                </span>
+              )}
+              {asset.floor && (
+                <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  {asset.floor}
+                </span>
+              )}
+              <StatusBadge status={asset.status} compact />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{asset.name}</h1>
+            <h1 className="font-heading text-xl sm:text-2xl font-semibold text-slate-900 mt-1">
+              {asset.name}
+            </h1>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button 
-            onClick={handlePrintQR}
-            className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 shadow-sm cursor-pointer"
+          <button
+            type="button"
+            onClick={() => navigate(`/maintenance?assetId=${asset.id}`)}
+            className="px-3 py-2 bg-amber-50/80 border border-amber-200 rounded-xl text-xs font-medium text-amber-800 hover:bg-amber-100/80 flex items-center gap-1.5 cursor-pointer transition"
           >
-            <Printer className="w-4 h-4 text-blue-600" /> In nhãn dán QR
+            <Wrench className="w-3.5 h-3.5" /> Báo hỏng
           </button>
-          <button 
-            onClick={() => navigate(`/assets/${asset.id}/edit`)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-blue-700 flex items-center gap-2 shadow transition cursor-pointer"
+          <button
+            type="button"
+            onClick={() => navigate(`/transfers?assetId=${asset.id}`)}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer transition"
           >
-            <Edit className="w-4 h-4" /> Sửa thông tin
+            <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" /> Điều chuyển
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintQR}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer transition"
+          >
+            <Printer className="w-3.5 h-3.5 text-blue-700" /> In nhãn QR
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/assets/${asset.id}/edit`)}
+            className="px-3.5 py-2 bg-blue-700 text-white rounded-xl text-xs font-medium hover:bg-blue-800 flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+          >
+            <Edit className="w-3.5 h-3.5" /> Sửa thông tin
           </button>
         </div>
       </div>
@@ -183,9 +223,9 @@ export default function AssetDetail() {
                     </div>
                     <div>
                       <div className="text-xs text-slate-500">Trạng thái hiện tại</div>
-                      <span className={`inline-flex mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${STATUS_COLORS[asset.status as keyof typeof STATUS_COLORS]}`}>
-                        {STATUS_LABELS[asset.status as keyof typeof STATUS_LABELS] || asset.status}
-                      </span>
+                      <div className="mt-1">
+                        <StatusBadge status={asset.status} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -207,7 +247,7 @@ export default function AssetDetail() {
                     </div>
                     <div>
                       <div className="text-xs text-slate-500">Người được giao phụ trách</div>
-                      <div className="font-medium text-slate-800">{asset.assignedTo || 'Toàn khoa'}</div>
+                      <div className="font-medium text-slate-800">{asset.assignedTo || 'Chưa giao cá nhân'}</div>
                     </div>
                   </div>
                 </div>
@@ -316,9 +356,22 @@ export default function AssetDetail() {
                 <div className="space-y-4">
                   {asset.maintenanceRequests.map((m: any) => (
                     <div key={m.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="font-bold text-sm text-slate-900">{m.issueDescription}</div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-bold text-sm text-slate-900">{m.issueDescription}</span>
+                            {m.issueType === 'SOFTWARE' && (
+                              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-semibold">
+                                💻 Lỗi phần mềm
+                              </span>
+                            )}
+                          </div>
+                          {m.ultraViewId && (
+                            <div className="mt-1.5 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-mono font-semibold text-blue-800">
+                              <span>UltraViewer ID: {m.ultraViewId}</span>
+                              {m.ultraViewPass && <span>| MK: {m.ultraViewPass}</span>}
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                             <span>Người đề nghị: <strong className="text-slate-800">{m.requestedBy}</strong> {m.contactPhone ? `(${m.contactPhone})` : ''}</span>
                             <span>•</span>
@@ -330,6 +383,30 @@ export default function AssetDetail() {
                               </>
                             )}
                           </div>
+                          {(() => {
+                            try {
+                              const urls = m.attachments ? JSON.parse(m.attachments) : [];
+                              if (!Array.isArray(urls) || urls.length === 0) return null;
+                              return (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {urls.map((url: string, idx: number) => (
+                                    <a
+                                      key={idx}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="w-24 h-16 rounded-lg overflow-hidden border border-slate-200 bg-white hover:opacity-90"
+                                      title="Bấm để xem ảnh phóng to"
+                                    >
+                                      <img src={url} alt={`Ảnh sự cố ${idx + 1}`} className="w-full h-full object-cover" />
+                                    </a>
+                                  ))}
+                                </div>
+                              );
+                            } catch {
+                              return null;
+                            }
+                          })()}
                         </div>
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                           m.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
@@ -425,28 +502,61 @@ export default function AssetDetail() {
           )}
 
           {/* TAB 5: KHẤU HAO */}
-          {activeTab === 'depreciation' && (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <div className="text-xs text-slate-500">Nguyên giá</div>
-                  <div className="text-lg font-bold text-slate-900">
-                    {asset.originalPrice ? Number(asset.originalPrice).toLocaleString('vi-VN') + ' đ' : '0 đ'}
+          {activeTab === 'depreciation' && (() => {
+            const orig = Number(asset.originalPrice || 0);
+            const curr = asset.currentValue !== undefined && asset.currentValue !== null ? Number(asset.currentValue) : null;
+            const rate = Number(asset.depreciationRate || 10);
+            const yearsUsed = asset.yearInUse ? Math.max(0, new Date().getFullYear() - Number(asset.yearInUse)) : 0;
+            const usedPct =
+              orig > 0 && curr !== null
+                ? Math.min(100, Math.max(0, Math.round(((orig - curr) / orig) * 100)))
+                : Math.min(100, Math.max(0, Math.round(yearsUsed * rate)));
+
+            return (
+              <div className="space-y-5 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
+                    <div className="text-xs text-slate-500">Nguyên giá</div>
+                    <div className="font-heading text-lg font-semibold text-slate-900 tabular-nums mt-1">
+                      {orig ? orig.toLocaleString('vi-VN') + ' đ' : '0 đ'}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
+                    <div className="text-xs text-slate-500">Tỷ lệ hao mòn hàng năm</div>
+                    <div className="font-heading text-lg font-semibold text-amber-700 tabular-nums mt-1">
+                      {rate}% / năm
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
+                    <div className="text-xs text-slate-500">Giá trị còn lại ước tính</div>
+                    <div className="font-heading text-lg font-semibold text-emerald-700 tabular-nums mt-1">
+                      {curr !== null ? curr.toLocaleString('vi-VN') + ' đ' : 'Theo niên hạn'}
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <div className="text-xs text-slate-500">Tỷ lệ hao mòn hàng năm</div>
-                  <div className="text-lg font-bold text-amber-600">{asset.depreciationRate || 10}% / năm</div>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-xl">
-                  <div className="text-xs text-slate-500">Giá trị còn lại ước tính</div>
-                  <div className="text-lg font-bold text-emerald-600">
-                    {asset.currentValue ? Number(asset.currentValue).toLocaleString('vi-VN') + ' đ' : 'Theo niên hạn'}
+
+                <div className="p-4 rounded-2xl border border-slate-200/80 bg-white space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-heading font-semibold text-slate-700">Tiến độ hao mòn ước tính</span>
+                    <span className="font-heading font-semibold text-blue-700 tabular-nums">{usedPct}% đã hao mòn</span>
                   </div>
+                  <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        usedPct >= 90 ? 'bg-amber-500' : 'bg-blue-700'
+                      }`}
+                      style={{ width: `${usedPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {asset.yearInUse
+                      ? `Bắt đầu sử dụng năm ${asset.yearInUse} (${yearsUsed} năm vận hành).`
+                      : 'Chưa cập nhật năm đưa vào sử dụng.'}
+                  </p>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

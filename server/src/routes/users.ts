@@ -164,7 +164,7 @@ router.delete('/:id', requireAuth, requireAdmin, async (req: any, res) => {
     }
 
     if (user.username === 'admin') {
-      return res.status(400).json({ error: 'Không thể xóa tài khoản Quản trị viên tối cao (admin)' });
+      return res.status(400).json({ error: 'Không thể xóa tài khoản Admin hệ thống' });
     }
 
     await prisma.user.delete({ where: { id } });

@@ -26,6 +26,15 @@ export interface AssetCategory {
 
 export type ManagingUnit = 'TCHC' | 'DUOC' | 'CNTT';
 
+export type TCHCAssetGroup =
+  | 'NOI_THAT'
+  | 'GIA_DUNG_XE'
+  | 'HVAC'
+  | 'DIEN_CS'
+  | 'PCCC'
+  | 'NUOC_VS'
+  | 'NHA_DAT';
+
 export interface Asset {
   id: number;
   assetCode: string;
@@ -38,6 +47,7 @@ export interface Asset {
   managingUnit?: ManagingUnit;
   floor?: string;
   buildingAsset?: number;
+  assetGroup?: TCHCAssetGroup | string | null;
   location?: string;
   locationDetail?: string;
   assignedTo?: string;
@@ -103,7 +113,11 @@ export interface MaintenanceRequest {
   department?: Department;
   managingUnit?: 'DUOC' | 'CNTT' | 'TCHC' | string;
   locationDetail?: string; // Vị trí phòng máy cụ thể
+  issueType?: 'HARDWARE' | 'SOFTWARE' | 'OTHER' | string;
   issueDescription: string;
+  ultraViewId?: string | null;
+  ultraViewPass?: string | null;
+  attachments?: string | null; // JSON array of image URLs
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
   repairCost?: number;
@@ -245,13 +259,13 @@ export const STATUS_LABELS: Record<AssetStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<AssetStatus, string> = {
-  DANG_SU_DUNG: 'bg-green-100 text-green-800',
-  HONG: 'bg-red-100 text-red-800',
-  KHONG_SU_DUNG: 'bg-gray-100 text-gray-800',
-  CHO_THANH_LY: 'bg-yellow-100 text-yellow-800',
-  DA_THANH_LY: 'bg-gray-200 text-gray-600',
-  BAO_TRI: 'bg-orange-100 text-orange-800',
-  CHO_PHAN_BO: 'bg-blue-100 text-blue-800',
+  DANG_SU_DUNG: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80',
+  HONG: 'bg-rose-50 text-rose-700 border border-rose-200/80',
+  KHONG_SU_DUNG: 'bg-slate-100 text-slate-600 border border-slate-200',
+  CHO_THANH_LY: 'bg-amber-50 text-amber-800 border border-amber-200/80',
+  DA_THANH_LY: 'bg-slate-200/80 text-slate-600 border border-slate-300/80',
+  BAO_TRI: 'bg-orange-50 text-orange-700 border border-orange-200/80',
+  CHO_PHAN_BO: 'bg-blue-50 text-blue-700 border border-blue-200/80',
 };
 
 export const MANAGING_UNIT_LABELS: Record<ManagingUnit, string> = {
@@ -266,3 +280,39 @@ export const PRIORITY_LABELS: Record<string, string> = {
   HIGH: 'Cao',
   URGENT: 'Khẩn cấp',
 };
+
+export const STANDARD_FLOORS = [
+  'Tầng Hầm',
+  'Tầng 1',
+  'Tầng 2',
+  'Tầng 3',
+  'Tầng 4',
+  'Tầng 5',
+  'Tầng 6',
+  'Tầng 7',
+  'Tầng Mái',
+  'Khối phụ trợ (KLCTN)',
+];
+
+export const TCHC_GROUP_OPTIONS: {
+  value: TCHCAssetGroup;
+  label: string;
+  scope: 'HC' | 'ME';
+  badgeClass: string;
+}[] = [
+  { value: 'NOI_THAT', label: 'Nội thất VP', scope: 'HC', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80' },
+  { value: 'GIA_DUNG_XE', label: 'Gia dụng, Quạt rời & Xe', scope: 'HC', badgeClass: 'bg-orange-50 text-orange-800 border-orange-200/80' },
+  { value: 'DIEN_CS', label: 'Điện & Chiếu sáng', scope: 'ME', badgeClass: 'bg-sky-50 text-sky-800 border-sky-200/80' },
+  { value: 'HVAC', label: 'Điều hòa & Thông gió', scope: 'ME', badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-200/80' },
+  { value: 'PCCC', label: 'PCCC & An toàn', scope: 'ME', badgeClass: 'bg-rose-50 text-rose-800 border-rose-200/80' },
+  { value: 'NUOC_VS', label: 'Cấp thoát nước & VS', scope: 'ME', badgeClass: 'bg-teal-50 text-teal-800 border-teal-200/80' },
+  { value: 'NHA_DAT', label: 'Nhà đất & Công trình', scope: 'ME', badgeClass: 'bg-purple-50 text-purple-800 border-purple-200/80' },
+];
+
+export const TCHC_GROUP_LABELS: Record<string, string> = Object.fromEntries(
+  TCHC_GROUP_OPTIONS.map((g) => [g.value, g.label])
+);
+
+export const TCHC_GROUP_META: Record<string, { label: string; scope: 'HC' | 'ME'; badgeClass: string }> = Object.fromEntries(
+  TCHC_GROUP_OPTIONS.map((g) => [g.value, g])
+);

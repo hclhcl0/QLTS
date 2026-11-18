@@ -49,7 +49,11 @@ router.get('/stats', requireAuth, async (req: any, res) => {
 
     const tchcTotal = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC' } });
     const tchcToanha = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', buildingAsset: 1 } });
+    const tchcToanhaDangSuDung = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', buildingAsset: 1, status: 'DANG_SU_DUNG' } });
+    const tchcToanhaBaoTri = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', buildingAsset: 1, status: { in: ['HONG', 'BAO_TRI'] } } });
     const tchcHanhchinh = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', buildingAsset: 0 } });
+    const tchcHanhchinhDangSuDung = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', buildingAsset: 0, status: 'DANG_SU_DUNG' } });
+    const tchcHanhchinhBaoTri = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', buildingAsset: 0, status: { in: ['HONG', 'BAO_TRI'] } } });
     const tchcDangSuDung = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', status: 'DANG_SU_DUNG' } });
     const tchcBaoTri = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', status: { in: ['HONG', 'BAO_TRI'] } } });
     const tchcChoThanhLy = await prisma.asset.count({ where: { ...baseWhere, managingUnit: 'TCHC', status: 'CHO_THANH_LY' } });
@@ -90,6 +94,7 @@ router.get('/stats', requireAuth, async (req: any, res) => {
       totalAssets,
       dangSuDung,
       hong,
+      baoTriOnly: baoTri,
       baoTri: baoTri + hong,
       choPhanBo,
       choThanhLy,
@@ -99,6 +104,8 @@ router.get('/stats', requireAuth, async (req: any, res) => {
       managingUnits: {
         cntt: { total: cnttTotal, dangSuDung: cnttDangSuDung, baoTri: cnttBaoTri, choThanhLy: cnttChoThanhLy },
         tchc: { total: tchcTotal, toanha: tchcToanha, hanhchinh: tchcHanhchinh, dangSuDung: tchcDangSuDung, baoTri: tchcBaoTri, choThanhLy: tchcChoThanhLy },
+        tchcHc: { total: tchcHanhchinh, dangSuDung: tchcHanhchinhDangSuDung, baoTri: tchcHanhchinhBaoTri },
+        tchcTn: { total: tchcToanha, dangSuDung: tchcToanhaDangSuDung, baoTri: tchcToanhaBaoTri },
         duoc: { total: duocTotal, dangSuDung: duocDangSuDung, baoTri: duocBaoTri, choThanhLy: duocChoThanhLy }
       },
       badges
@@ -157,17 +164,23 @@ router.get('/by-category', requireAuth, async (req: any, res) => {
     }
 
     if (isTchcMgr) {
-      const banGhe = await prisma.asset.count({ where: { managingUnit: 'TCHC', OR: [{ name: { contains: 'bàn' } }, { name: { contains: 'ghế' } }, { name: { contains: 'tủ' } }, { name: { contains: 'kệ' } }] } });
-      const dienLanh = await prisma.asset.count({ where: { managingUnit: 'TCHC', OR: [{ name: { contains: 'điều hòa' } }, { name: { contains: 'quạt' } }, { name: { contains: 'đèn' } }, { name: { contains: 'tủ lạnh' } }] } });
-      const toanha = await prisma.asset.count({ where: { managingUnit: 'TCHC', buildingAsset: 1 } });
-      const other = await prisma.asset.count({ where: { managingUnit: 'TCHC' } }) - (banGhe + dienLanh + toanha);
-
-      return res.json([
-        { name: 'Bàn ghế, Tủ kệ văn phòng', count: banGhe },
-        { name: 'Thiết bị Điện & Điều hòa', count: dienLanh },
-        { name: 'Hạ tầng tòa nhà (8 tầng)', count: toanha },
-        { name: 'Tài sản hành chính khác', count: Math.max(0, other) }
-      ]);
+      const grouped = await prisma.asset.groupBy({
+        by: ['assetGroup'],
+        where: { managingUnit: 'TCHC' },
+        _count: { id: true },
+      });
+      const gm = Object.fromEntries(grouped.map((g) => [g.assetGroup || 'OTHER', g._count.id]));
+      const items = [
+        { name: 'Hệ thống Điện & Chiếu sáng (M&E)', count: gm.DIEN_CS || 0, key: 'DIEN_CS' },
+        { name: 'Nội thất văn phòng (Khoa giữ)', count: gm.NOI_THAT || 0, key: 'NOI_THAT' },
+        { name: 'Điều hòa & Thông gió HVAC (M&E)', count: gm.HVAC || 0, key: 'HVAC' },
+        { name: 'Hệ thống PCCC & An toàn (M&E)', count: gm.PCCC || 0, key: 'PCCC' },
+        { name: 'Cấp thoát nước & Vệ sinh (M&E)', count: gm.NUOC_VS || 0, key: 'NUOC_VS' },
+        { name: 'Gia dụng, Quạt rời & Xe cộ (Khoa giữ)', count: gm.GIA_DUNG_XE || 0, key: 'GIA_DUNG_XE' },
+        { name: 'Nhà đất & Công trình kiến trúc', count: gm.NHA_DAT || 0, key: 'NHA_DAT' },
+      ];
+      if ((gm.OTHER || 0) > 0) items.push({ name: 'Nhóm khác', count: gm.OTHER, key: 'OTHER' });
+      return res.json(items.filter((i) => i.count > 0));
     }
 
     // ADMIN View
@@ -179,8 +192,8 @@ router.get('/by-category', requireAuth, async (req: any, res) => {
     const data = [
       { name: 'Trang thiết bị Y tế (Khoa Dược)', count: duocTotal },
       { name: 'Thiết bị CNTT (Tổ CNTT)', count: cnttTotal },
-      { name: 'Thiết bị Hành chính & CCDC (TCHC)', count: tchcHanhchinh },
-      { name: 'Cơ sở vật chất tòa nhà (TCHC)', count: tchcToanha },
+      { name: 'Trang bị Hành chính & Nội thất (TCHC)', count: tchcHanhchinh },
+      { name: 'Cơ điện & Hạ tầng Tòa nhà M&E (TCHC)', count: tchcToanha },
     ];
     res.json(data);
   } catch (error) {
@@ -234,6 +247,7 @@ router.get('/by-department', requireAuth, async (req: any, res) => {
     const data = departments
       .filter(d => d._count.assets > 0)
       .map(d => ({
+        id: d.id,
         name: d.code,
         fullName: d.name,
         count: d._count.assets

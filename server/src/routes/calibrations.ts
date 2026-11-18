@@ -1,14 +1,32 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRoles } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
+const requireCalibEditor = requireRoles('ADMIN', 'MANAGER_DUOC');
+
+router.use(requireAuth, requireRoles('ADMIN', 'VIEWER', 'MANAGER_DUOC', 'DEPARTMENT'));
+
+function applyCalibrationScope(user: any, baseWhere: any = {}) {
+  const where: any = { ...baseWhere };
+  if (user?.role === 'DEPARTMENT' && user.departmentId) {
+    where.asset = { ...(where.asset || {}), departmentId: user.departmentId };
+  } else if (user?.role === 'MANAGER_DUOC') {
+    where.asset = {
+      ...(where.asset || {}),
+      OR: [{ managingUnit: 'DUOC' }, { categoryId: 1 }],
+    };
+  }
+  return where;
+}
 
 // GET /api/calibrations/stats/summary - Thống kê tổng hợp Hiệu chuẩn / Thử nghiệm / Kiểm định / Kiểm xạ
-router.get('/stats/summary', requireAuth, async (req, res) => {
+router.get('/stats/summary', async (req: any, res) => {
   try {
-    const records = await prisma.calibrationRecord.findMany();
+    const records = await prisma.calibrationRecord.findMany({
+      where: applyCalibrationScope(req.user),
+    });
     const total = records.length;
     const distinctAssetCount = new Set(records.map(r => r.assetId)).size;
     const hieuChuan = records.filter(r => r.serviceType === 'HIEU_CHUAN').length;
@@ -37,9 +55,9 @@ router.get('/stats/summary', requireAuth, async (req, res) => {
 });
 
 // GET /api/calibrations - Danh sách hồ sơ với bộ lọc
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req: any, res) => {
   const { assetId, result, serviceType, search, departmentLocation } = req.query;
-  const where: any = {};
+  const where: any = applyCalibrationScope(req.user);
   
   if (assetId) where.assetId = parseInt(assetId as string);
   if (result && result !== 'ALL') where.result = result as string;
@@ -81,7 +99,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // GET /api/calibrations/upcoming - Danh sách sắp đến hạn hiệu chuẩn
-router.get('/upcoming', requireAuth, async (req, res) => {
+router.get('/upcoming', async (req: any, res) => {
   try {
     const days = parseInt(req.query.days as string) || 60;
     const now = new Date();
@@ -89,12 +107,12 @@ router.get('/upcoming', requireAuth, async (req, res) => {
     future.setDate(now.getDate() + days);
 
     const upcoming = await prisma.calibrationRecord.findMany({
-      where: {
+      where: applyCalibrationScope(req.user, {
         nextCalibrationDate: {
           gte: now,
           lte: future
         }
-      },
+      }),
       include: {
         asset: {
           include: {
@@ -113,15 +131,15 @@ router.get('/upcoming', requireAuth, async (req, res) => {
 });
 
 // GET /api/calibrations/overdue - Danh sách quá hạn hiệu chuẩn
-router.get('/overdue', requireAuth, async (req, res) => {
+router.get('/overdue', async (req: any, res) => {
   try {
     const now = new Date();
     const overdue = await prisma.calibrationRecord.findMany({
-      where: {
+      where: applyCalibrationScope(req.user, {
         nextCalibrationDate: {
           lt: now
         }
-      },
+      }),
       include: {
         asset: {
           include: {
@@ -140,13 +158,16 @@ router.get('/overdue', requireAuth, async (req, res) => {
 });
 
 // GET /api/calibrations/:id
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', async (req: any, res) => {
   try {
     const record = await prisma.calibrationRecord.findUnique({
       where: { id: parseInt(req.params.id) },
       include: { asset: { include: { department: true, category: true } } }
     });
     if (!record) return res.status(404).json({ error: 'Not found' });
+    if (req.user?.role === 'DEPARTMENT' && record.asset?.departmentId !== req.user.departmentId) {
+      return res.status(403).json({ error: 'Bạn không có quyền xem hồ sơ hiệu chuẩn của khoa khác.' });
+    }
     res.json(record);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -154,7 +175,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 // POST /api/calibrations - Thêm mới hồ sơ hiệu chuẩn / kiểm định
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireCalibEditor, async (req, res) => {
   try {
     const {
       assetId, calibrationDate, nextCalibrationDate, performedBy, vendor,
@@ -196,7 +217,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // PUT /api/calibrations/:id - Chỉnh sửa toàn bộ thông tin hồ sơ hiệu chuẩn
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireCalibEditor, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const {
@@ -239,7 +260,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/calibrations/:id - Xóa hồ sơ hiệu chuẩn
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireCalibEditor, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await prisma.calibrationRecord.delete({ where: { id } });

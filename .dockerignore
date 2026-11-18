@@ -10,3 +10,5 @@ server/prisma/dev.db*
 .env.local
 .env.*
 *.log
+.pgdata
+server/uploads

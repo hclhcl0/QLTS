@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Building2, Plus, Edit, Trash2, MapPin, Search, 
-  Package, Users, CheckCircle2, RefreshCw
+  Package, Users, CheckCircle2, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../lib/api';
 import { Department } from '../types';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
+import DataTableShell, { useTablePrefs } from '../components/ui/DataTableShell';
+import RowActionMenu from '../components/ui/RowActionMenu';
 
 export default function Departments() {
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { density, setDensity, cellPy, headPy } = useTablePrefs('departments');
+  const [departments, setDepartments] = useState<(Department & { assetBreakdown?: { total: number; duoc: number; cntt: number; tchcHc: number; tchcMe: number } })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'code' | 'name' | 'location' | 'assets'>('assets');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showModal, setShowModal] = useState(false);
   const [editingDept, setEditingDept] = useState<Partial<Department> | null>(null);
 
@@ -63,45 +74,86 @@ export default function Departments() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.code || !formData.name) {
-      alert('Vui lòng nhập Mã và Tên Khoa/Phòng');
+      toast.warning('Vui lòng nhập Mã và Tên Khoa/Phòng');
       return;
     }
 
     try {
       if (editingDept && editingDept.id) {
         await apiPut(`/departments/${editingDept.id}`, formData);
-        alert('Cập nhật thông tin Khoa/Phòng thành công!');
+        toast.success('Cập nhật thông tin Khoa/Phòng thành công!');
       } else {
         await apiPost('/departments', formData);
-        alert('Thêm mới Khoa/Phòng thành công!');
+        toast.success('Thêm mới Khoa/Phòng thành công!');
       }
       setShowModal(false);
       loadDepartments();
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi lưu Khoa/Phòng');
+      toast.error(e.message || 'Lỗi khi lưu Khoa/Phòng');
     }
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa đơn vị "${name}"?`)) return;
+    const ok = await confirm({
+      title: 'Xóa đơn vị / khoa phòng',
+      message: `Bạn có chắc muốn xóa đơn vị "${name}"?`,
+      confirmLabel: 'Xóa đơn vị',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await apiDelete(`/departments/${id}`);
       loadDepartments();
-      alert('Đã xóa đơn vị thành công!');
+      toast.success('Đã xóa đơn vị thành công!');
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi xóa đơn vị');
+      toast.error(e.message || 'Lỗi khi xóa đơn vị');
     }
   };
 
-  const filteredDepts = departments.filter(d => 
-    d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (d.description || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDepts = useMemo(() => {
+    const collator = new Intl.Collator('vi', { numeric: true, sensitivity: 'base' });
+    const dir = sortOrder === 'desc' ? -1 : 1;
+    const list = departments.filter(
+      (d) =>
+        d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        d.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (d.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    return list.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'code') cmp = collator.compare(a.code, b.code);
+      else if (sortBy === 'name') cmp = collator.compare(a.name, b.name);
+      else if (sortBy === 'location') cmp = collator.compare(a.location || '', b.location || '');
+      else {
+        const ca = a.assetBreakdown?.total ?? a._count?.assets ?? 0;
+        const cb = b.assetBreakdown?.total ?? b._count?.assets ?? 0;
+        cmp = ca - cb;
+      }
+      if (cmp !== 0) return cmp * dir;
+      return collator.compare(a.code, b.code);
+    });
+  }, [departments, searchTerm, sortBy, sortOrder]);
+
+  const handleSort = (field: 'code' | 'name' | 'location' | 'assets') => {
+    if (sortBy === field) setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortBy(field);
+      setSortOrder(field === 'assets' ? 'desc' : 'asc');
+    }
+  };
+
+  const renderSortIcon = (field: 'code' | 'name' | 'location' | 'assets') => {
+    if (sortBy !== field) return <ArrowUpDown className="w-3.5 h-3.5 text-slate-300" />;
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="w-3.5 h-3.5 text-blue-700" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-blue-700" />
+    );
+  };
 
   const cs1Count = departments.filter(d => d.location === 'Cơ sở 1').length;
   const cs2Count = departments.filter(d => d.location === 'Cơ sở 2').length;
-  const totalAssets = departments.reduce((sum, d) => sum + (d._count?.assets || 0), 0);
+  const totalAssets = departments.reduce((sum, d) => sum + (d.assetBreakdown?.total ?? d._count?.assets ?? 0), 0);
 
   return (
     <div className="space-y-6 pb-16">
@@ -159,8 +211,8 @@ export default function Departments() {
       </div>
 
       {/* Search & Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="space-y-3">
+        <div className="p-4 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -174,73 +226,166 @@ export default function Departments() {
           <span className="text-xs text-slate-500 font-medium">Hiển thị {filteredDepts.length} đơn vị</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="text-xs text-slate-600 uppercase bg-slate-50 border-b border-slate-200 font-bold">
-              <tr>
-                <th className="px-4 py-3.5 w-16 text-center">STT</th>
-                <th className="px-4 py-3.5 w-24">Mã ĐV</th>
-                <th className="px-4 py-3.5 min-w-[220px]">Tên Khoa / Phòng</th>
-                <th className="px-4 py-3.5 min-w-[130px]">Địa điểm (Cơ sở)</th>
-                <th className="px-4 py-3.5 min-w-[200px]">Địa chỉ chi tiết</th>
-                <th className="px-4 py-3.5 text-center w-36">Số lượng tài sản</th>
-                <th className="px-4 py-3.5 text-right w-24">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
+        <DataTableShell
+          title="Danh mục Khoa / Phòng"
+          totalCount={filteredDepts.length}
+          countLabel="đơn vị"
+          density={density}
+          onDensityChange={setDensity}
+          loading={loading}
+          isEmpty={filteredDepts.length === 0}
+          emptyMessage="Không tìm thấy khoa phòng nào phù hợp."
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="text-[11px] text-slate-600 uppercase tracking-wider bg-slate-50/90 border-b border-slate-200 font-heading font-semibold">
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">Đang tải danh sách khoa phòng...</td>
+                  <th className={`${headPy} px-4 w-28 whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('code')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                    >
+                      <span>Mã ĐV</span>
+                      {renderSortIcon('code')}
+                    </button>
+                  </th>
+                  <th className={`${headPy} px-4 min-w-[220px] whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('name')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                    >
+                      <span>Tên Khoa / Phòng</span>
+                      {renderSortIcon('name')}
+                    </button>
+                  </th>
+                  <th className={`${headPy} px-4 min-w-[200px] whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('location')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                    >
+                      <span>Cơ sở &amp; Địa chỉ</span>
+                      {renderSortIcon('location')}
+                    </button>
+                  </th>
+                  <th className={`${headPy} px-4 text-right min-w-[240px] whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('assets')}
+                      className="inline-flex items-center gap-1 ml-auto hover:text-slate-900 cursor-pointer"
+                    >
+                      <span>Cơ cấu &amp; Tổng Tài sản</span>
+                      {renderSortIcon('assets')}
+                    </button>
+                  </th>
+                  <th className={`${headPy} px-4 text-right w-24 whitespace-nowrap`}>Thao tác</th>
                 </tr>
-              ) : filteredDepts.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">Không tìm thấy khoa phòng nào phù hợp.</td>
-                </tr>
-              ) : (
-                filteredDepts.map((item, idx) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-4 py-3.5 text-center text-slate-400 font-semibold">{idx + 1}</td>
-                    <td className="px-4 py-3.5 font-mono font-bold text-blue-700">{item.code}</td>
-                    <td className="px-4 py-3.5 font-bold text-slate-900 text-sm">{item.name}</td>
-                    <td className="px-4 py-3.5">
-                      <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
-                        item.location === 'Cơ sở 2' 
-                          ? 'bg-purple-100 text-purple-800' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {item.location}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-500 text-[11px]">{item.description || '-'}</td>
-                    <td className="px-4 py-3.5 text-center">
-                      <span className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-full font-bold text-xs">
-                        {(item._count?.assets || 0).toLocaleString('vi-VN')} máy
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <button 
-                          onClick={() => handleOpenEdit(item)}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition" 
-                          title="Sửa thông tin"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(item.id, item.name)}
-                          className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition" 
-                          title="Xóa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {!loading &&
+                  filteredDepts.map((item) => {
+                    const bd = item.assetBreakdown;
+                    const count = bd?.total ?? item._count?.assets ?? 0;
+                    return (
+                    <tr key={item.id} className="hover:bg-slate-50/75 transition-colors">
+                      <td className={`${cellPy} px-4 align-top whitespace-nowrap`}>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 font-mono text-[11px] font-medium text-blue-700">
+                          {item.code}
+                        </span>
+                      </td>
+                      <td className={`${cellPy} px-4 align-top`}>
+                        <div className="font-heading font-semibold text-slate-800 text-sm leading-snug">
+                          {item.name}
+                        </div>
+                      </td>
+                      <td className={`${cellPy} px-4 align-top max-w-[300px]`}>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                              item.location === 'Cơ sở 2'
+                                ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                            }`}
+                          >
+                            {item.location}
+                          </span>
+                        </div>
+                        {item.description && (
+                          <div className="mt-1 text-[11px] text-slate-500 leading-snug break-words">
+                            {item.description}
+                          </div>
+                        )}
+                      </td>
+                      <td className={`${cellPy} px-4 align-top text-right whitespace-nowrap`}>
+                        <div className="inline-flex flex-col items-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/assets?departmentId=${item.id}`)}
+                            title={`Mở danh sách ${count} tài sản của ${item.name}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 rounded-full font-semibold text-xs tabular-nums transition cursor-pointer"
+                          >
+                            <span>{count.toLocaleString('vi-VN')} tài sản</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                          {bd && count > 0 && (
+                            <div className="flex flex-wrap items-center justify-end gap-1 text-[10px] tabular-nums">
+                              {bd.duoc > 0 && (
+                                <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Dược: {bd.duoc}
+                                </span>
+                              )}
+                              {bd.cntt > 0 && (
+                                <span className="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                  CNTT: {bd.cntt}
+                                </span>
+                              )}
+                              {bd.tchcHc > 0 && (
+                                <span className="px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                                  HC: {bd.tchcHc}
+                                </span>
+                              )}
+                              {bd.tchcMe > 0 && (
+                                <span className="px-1.5 py-0.2 rounded bg-orange-50 text-orange-800 border border-orange-200">
+                                  M&amp;E: {bd.tchcMe}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={`${cellPy} px-4 align-top text-right whitespace-nowrap`}>
+                        <RowActionMenu
+                          primary={{
+                            label: 'Sửa',
+                            title: 'Sửa thông tin',
+                            icon: <Edit className="w-3.5 h-3.5" />,
+                            onClick: () => handleOpenEdit(item),
+                            tone: 'blue',
+                          }}
+                          items={[
+                            {
+                              label: `Xem ${count} tài sản của đơn vị`,
+                              icon: <ExternalLink className="w-3.5 h-3.5" />,
+                              onClick: () => navigate(`/assets?departmentId=${item.id}`),
+                            },
+                            {
+                              label: 'Xóa khoa phòng',
+                              icon: <Trash2 className="w-3.5 h-3.5" />,
+                              onClick: () => handleDelete(item.id, item.name),
+                              danger: true,
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </DataTableShell>
       </div>
 
       {/* Modal Thêm / Sửa Khoa Phòng */}

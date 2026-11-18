@@ -2,12 +2,22 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, AlertTriangle, CheckCircle2, Clock, Award, Building, Calendar, 
   Search, Printer, DollarSign, FileText, CheckCircle, XCircle, Users,
-  Layers, ShieldCheck, Sparkles, Download, Edit3, Trash2
+  Layers, ShieldCheck, Sparkles, Download, Edit3, Trash2, Building2
 } from 'lucide-react';
-import { apiGet, apiPost, apiPut, apiDelete } from '../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete, apiDownload } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { Asset, CalibrationRecord } from '../types';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
+import DataTableShell, { useTablePrefs } from '../components/ui/DataTableShell';
+import RowActionMenu from '../components/ui/RowActionMenu';
 
 export default function Calibration() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'ADMIN' || user?.role === 'MANAGER_DUOC';
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { density, setDensity, cellPy, headPy } = useTablePrefs('calibration');
   const [records, setRecords] = useState<CalibrationRecord[]>([]);
   const [medicalAssets, setMedicalAssets] = useState<Asset[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -106,7 +116,7 @@ export default function Calibration() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.assetId || !formData.calibrationDate) {
-      alert('Vui lòng chọn thiết bị y tế và ngày thực hiện!');
+      toast.warning('Vui lòng chọn thiết bị y tế và ngày thực hiện!');
       return;
     }
 
@@ -136,11 +146,11 @@ export default function Calibration() {
         note: formData.note
       });
 
-      alert('Đã thêm hồ sơ hiệu chuẩn / kiểm định TBYT thành công!');
+      toast.success('Đã thêm hồ sơ hiệu chuẩn / kiểm định TBYT thành công!');
       setShowModal(false);
       fetchData();
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi lưu kết quả hiệu chuẩn');
+      toast.error(e.message || 'Lỗi khi lưu kết quả hiệu chuẩn');
     }
   };
 
@@ -174,7 +184,7 @@ export default function Calibration() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editData.assetId || !editData.calibrationDate) {
-      alert('Vui lòng chọn thiết bị y tế và ngày thực hiện!');
+      toast.warning('Vui lòng chọn thiết bị y tế và ngày thực hiện!');
       return;
     }
     try {
@@ -196,28 +206,34 @@ export default function Calibration() {
         fundingSource: editData.fundingSource,
         note: editData.note
       });
-      alert('Đã cập nhật hồ sơ hiệu chuẩn / kiểm định thành công!');
+      toast.success('Đã cập nhật hồ sơ hiệu chuẩn / kiểm định thành công!');
       setShowEditModal(false);
       fetchData();
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi cập nhật hồ sơ');
+      toast.error(e.message || 'Lỗi khi cập nhật hồ sơ');
     }
   };
 
   // Delete Record
   const handleDeleteRecord = async (id: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa hồ sơ hiệu chuẩn này?')) return;
+    const ok = await confirm({
+      title: 'Xóa hồ sơ hiệu chuẩn',
+      message: 'Bạn có chắc chắn muốn xóa hồ sơ hiệu chuẩn này?',
+      confirmLabel: 'Xóa hồ sơ',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await apiDelete(`/calibrations/${id}`);
-      alert('Đã xóa hồ sơ hiệu chuẩn thành công!');
+      toast.success('Đã xóa hồ sơ hiệu chuẩn thành công!');
       fetchData();
     } catch (e: any) {
-      alert(e.message || 'Lỗi khi xóa hồ sơ');
+      toast.error(e.message || 'Lỗi khi xóa hồ sơ');
     }
   };
 
   // Export Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const params = new URLSearchParams();
     if (serviceTypeFilter && serviceTypeFilter !== 'ALL') params.append('serviceType', serviceTypeFilter);
     if (locationFilter && locationFilter !== 'ALL') params.append('location', locationFilter);
@@ -225,7 +241,12 @@ export default function Calibration() {
     params.append('sortBy', exportSortBy);
     params.append('sortOrder', exportSortOrder);
 
-    window.open(`/api/export/calibrations?${params.toString()}`, '_blank');
+    try {
+      await apiDownload(`/export/calibrations?${params.toString()}`, 'hieu_chuan_tbyt.xlsx');
+      toast.success('Đã xuất danh sách hiệu chuẩn ra file Excel.');
+    } catch (e: any) {
+      toast.error(e.message || 'Không thể xuất file Excel');
+    }
     setShowExportModal(false);
   };
 
@@ -278,12 +299,14 @@ export default function Calibration() {
             <Printer className="w-4 h-4" /> In Bảng Theo Dõi A4
           </button>
           
-          <button 
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Thêm Phiếu Hiệu Chuẩn Mới
-          </button>
+          {canEdit && (
+            <button 
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Thêm Phiếu Hiệu Chuẩn Mới
+            </button>
+          )}
         </div>
       </div>
 
@@ -376,85 +399,143 @@ export default function Calibration() {
       </div>
 
       {/* 4. DATA TABLE */}
-      <div className="print:hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-600 font-bold uppercase border-b border-slate-200">
-              <tr>
-                <th className="p-3.5 w-10 text-center">STT</th>
-                <th className="p-3.5">Mã TBYT</th>
-                <th className="p-3.5 min-w-[200px]">Tên thiết bị y tế</th>
-                <th className="p-3.5">Bộ phận sử dụng</th>
-                <th className="p-3.5">Loại hình</th>
-                <th className="p-3.5 min-w-[150px]">Đơn vị thực hiện</th>
-                <th className="p-3.5">Ngày hoàn thành</th>
-                <th className="p-3.5 text-right">Kinh phí (đ)</th>
-                <th className="p-3.5">Đánh giá sau HC</th>
-                <th className="p-3.5 min-w-[120px]">Người nghiệm thu</th>
-                <th className="p-3.5 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={11} className="text-center py-12 text-slate-400">Đang tải hồ sơ hiệu chuẩn...</td></tr>
-              ) : filteredRecords.length === 0 ? (
-                <tr><td colSpan={11} className="text-center py-12 text-slate-400">Không tìm thấy thiết bị nào phù hợp.</td></tr>
-              ) : (
-                filteredRecords.map((r, idx) => (
-                  <tr key={r.id} className="hover:bg-slate-50/80 transition">
-                    <td className="p-3.5 text-center text-slate-500">{idx + 1}</td>
-                    <td className="p-3.5 font-mono font-bold text-emerald-700">{r.asset?.assetCode || '-'}</td>
-                    <td className="p-3.5 font-bold text-slate-900">{r.asset?.name}</td>
-                    <td className="p-3.5 text-slate-700 font-medium">{(r as any).departmentLocation || r.asset?.department?.name || 'CDC'}</td>
-                    <td className="p-3.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        r.serviceType === 'THU_NGHIEM' ? 'bg-purple-100 text-purple-800' :
-                        r.serviceType === 'KIEM_DINH' ? 'bg-blue-100 text-blue-800' :
-                        r.serviceType === 'KIEM_XA' ? 'bg-red-100 text-red-800' :
-                        'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {r.serviceType === 'THU_NGHIEM' ? 'Thử nghiệm' :
-                         r.serviceType === 'KIEM_DINH' ? 'Kiểm định' :
-                         r.serviceType === 'KIEM_XA' ? 'Kiểm xạ' : 'Hiệu chuẩn'}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-slate-700 max-w-xs">{r.vendor || 'TT SMETES'}</td>
-                    <td className="p-3.5 text-slate-600">{new Date(r.calibrationDate).toLocaleDateString('vi-VN')}</td>
-                    <td className="p-3.5 text-right font-mono font-bold text-slate-900">
-                      {r.cost ? Number(r.cost).toLocaleString('vi-VN') : '0'}
-                    </td>
-                    <td className="p-3.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        r.result === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {(r as any).deviceStatusAfter || (r.result === 'PASS' ? 'Tốt' : 'Không đạt')}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-slate-600 text-[11px]">{(r as any).acceptanceMembers || r.performedBy || '-'}</td>
-                    <td className="p-3.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleOpenEdit(r)}
-                          className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg transition cursor-pointer"
-                          title="Chỉnh sửa hồ sơ hiệu chuẩn"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRecord(r.id)}
-                          className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition cursor-pointer"
-                          title="Xóa hồ sơ hiệu chuẩn"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="print:hidden">
+        <DataTableShell
+          title="Hồ sơ kiểm định & hiệu chuẩn TBYT"
+          totalCount={filteredRecords.length}
+          countLabel="hồ sơ"
+          density={density}
+          onDensityChange={setDensity}
+          loading={loading}
+          isEmpty={filteredRecords.length === 0}
+          emptyMessage="Không tìm thấy thiết bị nào phù hợp."
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                <tr>
+                  <th className={`${headPy} px-3.5 w-28 whitespace-nowrap`}>Mã TBYT</th>
+                  <th className={`${headPy} px-3.5 min-w-[260px] whitespace-nowrap`}>Thiết bị &amp; Khoa phòng</th>
+                  <th className={`${headPy} px-3.5 whitespace-nowrap`}>Đơn vị &amp; Nghiệm thu</th>
+                  <th className={`${headPy} px-3.5 whitespace-nowrap`}>Thời gian &amp; Hạn tới</th>
+                  <th className={`${headPy} px-3.5 text-right whitespace-nowrap`}>Kết quả &amp; Kinh phí</th>
+                  <th className={`${headPy} px-3.5 w-24 text-right whitespace-nowrap`}>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {!loading &&
+                  filteredRecords.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50/75 transition-colors">
+                      <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/70 font-mono text-[11px] font-medium text-emerald-700">
+                          {r.asset?.assetCode || '-'}
+                        </span>
+                      </td>
+
+                      <td className={`${cellPy} px-3.5 align-top max-w-[340px]`}>
+                        <div className="font-heading font-semibold text-slate-800 leading-snug line-clamp-2" title={r.asset?.name}>
+                          {r.asset?.name}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap ${
+                              r.serviceType === 'THU_NGHIEM'
+                                ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
+                                : r.serviceType === 'KIEM_DINH'
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                  : r.serviceType === 'KIEM_XA'
+                                    ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                            }`}
+                          >
+                            {r.serviceType === 'THU_NGHIEM'
+                              ? 'Thử nghiệm'
+                              : r.serviceType === 'KIEM_DINH'
+                                ? 'Kiểm định'
+                                : r.serviceType === 'KIEM_XA'
+                                  ? 'Kiểm xạ'
+                                  : 'Hiệu chuẩn'}
+                          </span>
+                          <span className="inline-flex items-center gap-1 truncate max-w-[200px]">
+                            <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate">
+                              {(r as any).departmentLocation || r.asset?.department?.name || 'CDC'}
+                            </span>
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className={`${cellPy} px-3.5 align-top max-w-[250px]`}>
+                        <div className="font-medium text-slate-700 leading-snug break-words">
+                          {r.vendor || 'TT SMETES'}
+                        </div>
+                        <div className="mt-1 flex items-start gap-1 text-[11px] text-slate-500">
+                          <Users className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2 leading-snug break-words">
+                            {(r as any).acceptanceMembers || r.performedBy || '-'}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className={`${cellPy} px-3.5 align-top whitespace-nowrap`}>
+                        <div className="font-medium text-slate-800 tabular-nums">
+                          {new Date(r.calibrationDate).toLocaleDateString('vi-VN')}
+                        </div>
+                        {r.nextCalibrationDate ? (
+                          <div className="mt-1 text-[11px] text-slate-500 tabular-nums">
+                            Hạn tới: {new Date(r.nextCalibrationDate).toLocaleDateString('vi-VN')}
+                          </div>
+                        ) : (
+                          <div className="mt-1 text-[11px] text-slate-400">Theo kỳ ISO</div>
+                        )}
+                      </td>
+
+                      <td className={`${cellPy} px-3.5 align-top text-right whitespace-nowrap`}>
+                        <div>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                              r.result === 'PASS'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                            }`}
+                          >
+                            {(r as any).deviceStatusAfter || (r.result === 'PASS' ? 'Tốt' : 'Không đạt')}
+                          </span>
+                        </div>
+                        <div className="mt-1 font-sans font-semibold text-slate-800 tabular-nums">
+                          {r.cost ? Number(r.cost).toLocaleString('vi-VN') : '0'} đ
+                        </div>
+                      </td>
+
+                      <td className={`${cellPy} px-3.5 align-top text-right whitespace-nowrap`}>
+                        {canEdit ? (
+                          <RowActionMenu
+                            primary={{
+                              label: 'Sửa',
+                              title: 'Chỉnh sửa hồ sơ hiệu chuẩn',
+                              icon: <Edit3 className="w-3.5 h-3.5" />,
+                              onClick: () => handleOpenEdit(r),
+                              tone: 'blue',
+                            }}
+                            items={[
+                              {
+                                label: 'Xóa hồ sơ',
+                                icon: <Trash2 className="w-3.5 h-3.5" />,
+                                onClick: () => handleDeleteRecord(r.id),
+                                danger: true,
+                              },
+                            ]}
+                          />
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Chỉ xem</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </DataTableShell>
       </div>
 
       {/* ========================================================================= */}
