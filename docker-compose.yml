@@ -1,21 +1,22 @@
-version: '3.8'
-
 services:
   qlts-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: qlts-cdc-danang
     restart: always
     ports:
-      - "3001:3001"
+      - "${PORT:-3001}:${PORT:-3001}"
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - JWT_SECRET=qlts-cdc-danang-secret-key-2026
-      - DATABASE_URL=file:./dev.db
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3001}
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET:-qlts-cdc-danang-secret-key-2026}
+      - UPLOADS_DIR=${UPLOADS_DIR:-/app/server/uploads}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
     volumes:
-      - qlts_data:/app/server/prisma
+      - qlts_data:/app/data
       - qlts_uploads:/app/server/uploads
 
 volumes:
