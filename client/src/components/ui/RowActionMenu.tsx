@@ -78,7 +78,7 @@ export default function RowActionMenu({ primary, items = [] }: RowActionMenuProp
           type="button"
           onClick={primary.onClick}
           title={primary.title || primary.label}
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-medium transition cursor-pointer whitespace-nowrap ${
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium transition cursor-pointer whitespace-nowrap ${
             TONE_MAP[primary.tone || 'slate']
           }`}
         >
@@ -95,7 +95,7 @@ export default function RowActionMenu({ primary, items = [] }: RowActionMenuProp
           aria-haspopup="menu"
           aria-expanded={open}
           title="Thao tác khác"
-          className={`p-1.5 rounded-lg border transition cursor-pointer ${
+          className={`p-1.5 rounded-md border transition cursor-pointer ${
             open
               ? 'bg-slate-900 text-white border-slate-900'
               : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-800'

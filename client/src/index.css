@@ -5,22 +5,22 @@
   --font-heading: 'Plus Jakarta Sans', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --color-canvas: #F8FAFC;
+  --color-canvas: #F4F7FA;
   --color-surface: #FFFFFF;
   --color-surface-subtle: #F1F5F9;
   --color-border: #E2E8F0;
   --color-ink: #0F172A;
   --color-ink-muted: #475569;
-  --color-primary: #1E40AF;
-  --color-primary-hover: #1D4ED8;
-  --color-accent: #0D9488;
+  --color-primary: #0E7490;
+  --color-primary-hover: #0891B2;
+  --color-accent: #059669;
 }
 
 :root {
-  --primary: #1E40AF;
-  --primary-dark: #1E3A8A;
-  --accent: #0D9488;
-  --canvas: #F8FAFC;
+  --primary: #0E7490;
+  --primary-dark: #155E75;
+  --accent: #059669;
+  --canvas: #F4F7FA;
 }
 
 @layer base {
@@ -29,6 +29,7 @@
     background-color: var(--canvas);
     color: #0F172A;
     text-rendering: optimizeLegibility;
+    overflow-x: clip;
   }
 
   body {
@@ -37,6 +38,7 @@
     line-height: 1.5;
     background-color: var(--canvas);
     color: #0F172A;
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, .font-heading {
@@ -49,13 +51,21 @@
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid #2563EB;
+    outline: 2px solid #0891B2;
     outline-offset: 2px;
   }
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Subtle slim scrollbar matching Clinical Swiss aesthetic */

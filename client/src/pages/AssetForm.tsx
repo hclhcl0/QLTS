@@ -253,7 +253,7 @@ export default function AssetForm() {
         <button
           type="button"
           onClick={() => navigate('/assets')}
-          className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-medium cursor-pointer transition"
+          className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-md text-xs font-medium cursor-pointer transition"
         >
           Quay lại danh sách thiết bị
         </button>
@@ -269,7 +269,7 @@ export default function AssetForm() {
           type="button"
           onClick={() => navigate(-1)}
           aria-label="Quay lại"
-          className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 cursor-pointer transition"
+          className="p-2 hover:bg-slate-100 rounded-md text-slate-500 cursor-pointer transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -612,14 +612,14 @@ export default function AssetForm() {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="px-5 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              className="px-5 py-2 border border-slate-200 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-700 text-white rounded-xl text-sm font-medium hover:bg-blue-800 shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-70"
+              className="px-6 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-70"
             >
               <Save className="w-4 h-4" /> {loading ? 'Đang lưu...' : 'Lưu thông tin thiết bị'}
             </button>

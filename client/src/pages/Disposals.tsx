@@ -376,25 +376,32 @@ export default function Disposals() {
   });
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* 1. TOP HEADER */}
-      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Quy trình chuẩn 4 bước</span>
-            <h1 className="text-2xl font-bold text-slate-900">Quản lý Đề xuất & Thanh lý Tài sản</h1>
+    <div className="space-y-4 pb-12">
+      {/* 1. COMPACT HEADER */}
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              Đề Xuất &amp; Thanh Lý Tài Sản
+            </h1>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">
+              Quy trình 4 bước
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Quy trình: <strong>Thông báo đợt ➔ Khoa/Phòng đề xuất ➔ Thẩm định kỹ thuật ➔ Họp Hội đồng thanh lý</strong>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Thông báo đợt · Khoa/Phòng đề xuất · Thẩm định kỹ thuật · Họp Hội đồng thanh lý
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition cursor-pointer"
+            title="In biên bản thanh lý A4"
+            aria-label="In biên bản A4"
+            className="flex items-center gap-1.5 p-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 shadow-2xs transition cursor-pointer"
           >
-            <Printer className="w-4 h-4" /> In Biên bản A4
+            <Printer className="w-4 h-4" />
+            <span className="hidden lg:inline">In A4</span>
           </button>
           
           <button 
@@ -405,82 +412,48 @@ export default function Disposals() {
               setModalAssetSearch('');
               setShowCreateProposalModal(true);
             }}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow transition cursor-pointer"
+            title="Lập đề xuất thanh lý tài sản mới"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-700 rounded-md hover:bg-blue-800 shadow-xs transition cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Khoa/Phòng Lập Đề Xuất
+            <Plus className="w-4 h-4" />
+            <span>Tạo đề xuất</span>
           </button>
         </div>
       </div>
 
-      {/* 2. WORKFLOW 4 STEPS NAVIGATION TABS */}
-      <div className="print:hidden grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Step 1 */}
-        <div 
-          onClick={() => setActiveTab('CAMPAIGNS')}
-          className={`p-4 rounded-2xl border-2 cursor-pointer transition ${
-            activeTab === 'CAMPAIGNS'
-              ? 'border-blue-600 bg-blue-50/60 shadow-xs'
-              : 'border-slate-200 bg-white hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Bước 1</span>
-            <Bell className="w-4 h-4 text-blue-600" />
-          </div>
-          <div className="font-bold text-sm text-slate-900 mt-1">Thông báo đợt thanh lý</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Ban Giám Đốc ban hành đợt</div>
-        </div>
-
-        {/* Step 2 */}
-        <div 
-          onClick={() => setActiveTab('PROPOSALS')}
-          className={`p-4 rounded-2xl border-2 cursor-pointer transition ${
-            activeTab === 'PROPOSALS'
-              ? 'border-blue-600 bg-blue-50/60 shadow-xs'
-              : 'border-slate-200 bg-white hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Bước 2</span>
-            <FileText className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="font-bold text-sm text-slate-900 mt-1">Khoa/Phòng đề xuất</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Gửi báo cáo về Dược / CNTT / TCHC</div>
-        </div>
-
-        {/* Step 3 */}
-        <div 
-          onClick={() => setActiveTab('INSPECTIONS')}
-          className={`p-4 rounded-2xl border-2 cursor-pointer transition ${
-            activeTab === 'INSPECTIONS'
-              ? 'border-blue-600 bg-blue-50/60 shadow-xs'
-              : 'border-slate-200 bg-white hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Bước 3</span>
-            <ClipboardCheck className="w-4 h-4 text-purple-600" />
-          </div>
-          <div className="font-bold text-sm text-slate-900 mt-1">Kiểm tra tình trạng</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Biên bản thẩm định kỹ thuật</div>
-        </div>
-
-        {/* Step 4 */}
-        <div 
-          onClick={() => setActiveTab('BOARD_MEETING')}
-          className={`p-4 rounded-2xl border-2 cursor-pointer transition ${
-            activeTab === 'BOARD_MEETING'
-              ? 'border-blue-600 bg-blue-50/60 shadow-xs'
-              : 'border-slate-200 bg-white hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Bước 4</span>
-            <Users className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="font-bold text-sm text-slate-900 mt-1">Biên bản Hội đồng</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Phê duyệt & Quyết định thanh lý</div>
-        </div>
+      {/* 2. COMPACT 4-STEP SEGMENTED BAR */}
+      <div className="print:hidden p-1.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-2 lg:grid-cols-4 gap-1.5">
+        {[
+          { key: 'CAMPAIGNS' as const, step: '1', label: 'Thông báo đợt thanh lý', icon: Bell },
+          { key: 'PROPOSALS' as const, step: '2', label: 'Khoa/Phòng đề xuất', icon: FileText },
+          { key: 'INSPECTIONS' as const, step: '3', label: 'Thẩm định kỹ thuật', icon: ClipboardCheck },
+          { key: 'BOARD_MEETING' as const, step: '4', label: 'Biên bản Hội đồng', icon: Users },
+        ].map((item) => {
+          const Icon = item.icon;
+          const active = activeTab === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setActiveTab(item.key)}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-left transition cursor-pointer ${
+                active
+                  ? 'bg-blue-700 text-white shadow-2xs'
+                  : 'text-slate-700 hover:bg-slate-100/80'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full text-[11px] font-bold inline-flex items-center justify-center shrink-0 ${
+                  active ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                }`}
+              >
+                {item.step}
+              </span>
+              <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-slate-500'}`} />
+              <span className="text-xs font-semibold truncate">{item.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* 3. STEP CONTENT */}
@@ -495,7 +468,7 @@ export default function Disposals() {
             </div>
             <button
               onClick={() => setShowCreateCampaignModal(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Ban hành Đợt mới
             </button>
@@ -580,7 +553,107 @@ export default function Disposals() {
             isEmpty={filteredDisposals.length === 0}
             emptyMessage="Chưa có đề xuất thanh lý nào phù hợp."
           >
-            <div className="overflow-x-auto">
+            {/* Mobile Card View (< md) */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {!loading &&
+                filteredDisposals.map((item: any) => (
+                  <div key={item.id} className="p-3.5 space-y-2 bg-white">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 font-mono text-[11px] font-medium text-blue-700">
+                          {item.asset?.assetCode || '-'}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            item.asset?.managingUnit === 'DUOC'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                              : item.asset?.managingUnit === 'CNTT'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                : 'bg-amber-50 text-amber-800 border border-amber-200/70'
+                          }`}
+                        >
+                          {item.asset?.managingUnit === 'DUOC'
+                            ? 'Khoa Dược'
+                            : item.asset?.managingUnit === 'CNTT'
+                              ? 'Tổ CNTT'
+                              : 'Phòng TCHC'}
+                        </span>
+                      </div>
+
+                      <span
+                        className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          item.status === 'COMPLETED'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                            : item.status === 'APPROVED'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                              : item.status === 'INSPECTED'
+                                ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
+                                : 'bg-amber-50 text-amber-800 border border-amber-200/70'
+                        }`}
+                      >
+                        {item.status === 'COMPLETED'
+                          ? 'Đã thanh lý'
+                          : item.status === 'APPROVED'
+                            ? 'HĐ đã duyệt'
+                            : item.status === 'INSPECTED'
+                              ? 'Đã thẩm định KT'
+                              : 'Chờ thẩm định KT'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="font-heading text-sm font-semibold text-slate-900 leading-snug">
+                        {item.asset?.name}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {item.asset?.department?.name || 'CDC'}
+                      </div>
+                    </div>
+
+                    <div className="text-xs space-y-0.5">
+                      <div className="text-slate-700 line-clamp-2">{item.reason}</div>
+                      {item.technicalAssessment ? (
+                        <div className="text-[11px] text-slate-600 font-medium line-clamp-2">
+                          KT: {item.technicalAssessment}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-400 italic">Chưa thẩm định kỹ thuật</div>
+                      )}
+                    </div>
+
+                    {item.status !== 'COMPLETED' && (
+                      <div className="pt-1 border-t border-slate-100">
+                        {item.status === 'PROPOSED' && (
+                          <button
+                            onClick={() => handleOpenInspection(item)}
+                            className="w-full min-h-[38px] px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+                          >
+                            Thẩm định kỹ thuật
+                          </button>
+                        )}
+                        {item.status === 'INSPECTED' && (
+                          <button
+                            onClick={() => handleApprove(item.id)}
+                            className="w-full min-h-[38px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+                          >
+                            Hội đồng duyệt thanh lý
+                          </button>
+                        )}
+                        {item.status === 'APPROVED' && (
+                          <button
+                            onClick={() => handleComplete(item.id)}
+                            className="w-full min-h-[38px] px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+                          >
+                            Hoàn tất thanh lý
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs text-left border-collapse">
                 <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
                   <tr>
@@ -670,7 +743,7 @@ export default function Disposals() {
                           {item.status === 'PROPOSED' && (
                             <button
                               onClick={() => handleOpenInspection(item)}
-                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
                             >
                               Thẩm định KT
                             </button>
@@ -678,7 +751,7 @@ export default function Disposals() {
                           {item.status === 'INSPECTED' && (
                             <button
                               onClick={() => handleApprove(item.id)}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
                             >
                               HĐ Duyệt
                             </button>
@@ -686,7 +759,7 @@ export default function Disposals() {
                           {item.status === 'APPROVED' && (
                             <button
                               onClick={() => handleComplete(item.id)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
                             >
                               Hoàn tất
                             </button>
@@ -717,14 +790,14 @@ export default function Disposals() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowDisposalSignaturesModal(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-md text-xs font-bold transition cursor-pointer"
                 title="Tùy chỉnh Hội đồng & Người ký"
               >
                 <Users className="w-4 h-4 text-blue-600" /> Cấu hình Người ký
               </button>
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow transition cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-bold shadow transition cursor-pointer"
                 title="Xuất trực tiếp sang file PDF hoặc in ấn biên bản kiểm tra kỹ thuật A4"
               >
                 <Printer className="w-4 h-4" /> Xuất PDF / In Biên Bản Kỹ Thuật A4
@@ -824,14 +897,14 @@ export default function Disposals() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowDisposalSignaturesModal(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-md text-xs font-bold transition cursor-pointer"
                 title="Tùy chỉnh Hội đồng & Người ký"
               >
                 <Users className="w-4 h-4 text-blue-600" /> Cấu hình Hội đồng & Người ký
               </button>
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow transition cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-bold shadow transition cursor-pointer"
                 title="Xuất trực tiếp sang file PDF hoặc in ấn biên bản họp Hội đồng thanh lý A4"
               >
                 <Printer className="w-4 h-4" /> Xuất PDF / In Biên Bản Họp HĐ A4
@@ -988,7 +1061,7 @@ export default function Disposals() {
               </div>
               <button 
                 onClick={() => setShowCreateProposalModal(false)} 
-                className="p-1.5 hover:bg-white/20 rounded-xl transition text-white cursor-pointer"
+                className="p-1.5 hover:bg-white/20 rounded-md transition text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -1048,7 +1121,7 @@ export default function Disposals() {
                       <button
                         type="button"
                         onClick={selectAllFilteredAssets}
-                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg transition cursor-pointer text-[11px]"
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-md transition cursor-pointer text-[11px]"
                       >
                         Chọn tất cả ({filteredCandidateAssets.length})
                       </button>
@@ -1056,7 +1129,7 @@ export default function Disposals() {
                         <button
                           type="button"
                           onClick={deselectAllFilteredAssets}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg transition cursor-pointer text-[11px]"
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-md transition cursor-pointer text-[11px]"
                         >
                           Bỏ chọn
                         </button>
@@ -1071,7 +1144,7 @@ export default function Disposals() {
                       <button
                         type="button"
                         onClick={() => setModalUnitFilter('ALL')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                           modalUnitFilter === 'ALL'
                             ? 'bg-slate-900 text-white shadow-xs'
                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -1082,35 +1155,35 @@ export default function Disposals() {
                       <button
                         type="button"
                         onClick={() => setModalUnitFilter('DUOC')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                           modalUnitFilter === 'DUOC'
                             ? 'bg-emerald-600 text-white shadow-xs'
                             : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                         }`}
                       >
-                        🩺 Khoa Dược (TBYT)
+                        Khoa Dược (TBYT)
                       </button>
                       <button
                         type="button"
                         onClick={() => setModalUnitFilter('CNTT')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                           modalUnitFilter === 'CNTT'
                             ? 'bg-blue-600 text-white shadow-xs'
                             : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
                         }`}
                       >
-                        💻 Tổ CNTT
+                        Tổ CNTT
                       </button>
                       <button
                         type="button"
                         onClick={() => setModalUnitFilter('TCHC')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                           modalUnitFilter === 'TCHC'
                             ? 'bg-amber-600 text-white shadow-xs'
                             : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
                         }`}
                       >
-                        🏢 Phòng TCHC
+                        Phòng TCHC
                       </button>
                     </div>
 
@@ -1144,7 +1217,7 @@ export default function Disposals() {
                   <button
                     type="button"
                     onClick={() => setShowCreateProposalModal(false)}
-                    className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                    className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                   >
                     Hủy bỏ
                   </button>
@@ -1153,7 +1226,7 @@ export default function Disposals() {
                     type="button"
                     onClick={handleProceedToSummary}
                     disabled={selectedAssetIds.length === 0}
-                    className={`px-5 py-2.5 rounded-xl font-bold shadow flex items-center gap-2 transition cursor-pointer text-xs ${
+                    className={`px-5 py-2.5 rounded-md font-bold shadow flex items-center gap-2 transition cursor-pointer text-xs ${
                       selectedAssetIds.length === 0
                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                         : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30'
@@ -1205,7 +1278,7 @@ export default function Disposals() {
                   {/* Thanh áp dụng lý do nhanh cho tất cả */}
                   <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center gap-2">
                     <span className="font-bold text-slate-600 text-[11px] flex items-center gap-1">
-                      💡 Áp dụng nhanh lý do mẫu cho tất cả:
+                      Áp dụng nhanh lý do mẫu cho tất cả:
                     </span>
                     <select
                       value={quickReasonSelect}
@@ -1281,28 +1354,28 @@ export default function Disposals() {
                                 onClick={() => handleUpdateItemReason(item.assetId, 'Hư hỏng nặng không thể phục hồi, chi phí sửa chữa không hiệu quả kinh tế')}
                                 className="px-1.5 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 rounded transition cursor-pointer"
                               >
-                                🏷️ Hỏng nặng
+                                Hỏng nặng
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateItemReason(item.assetId, 'Thiết bị đã qua nhiều năm sử dụng, linh kiện hao mòn, chập cháy bo mạch chính')}
                                 className="px-1.5 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 rounded transition cursor-pointer"
                               >
-                                🏷️ Hao mòn chập mạch
+                                Hao mòn chập mạch
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateItemReason(item.assetId, 'Lạc hậu công nghệ, không còn linh kiện và hóa chất tương thích chính hãng')}
                                 className="px-1.5 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 rounded transition cursor-pointer"
                               >
-                                🏷️ Hết linh kiện thay
+                                Hết linh kiện thay
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateItemReason(item.assetId, 'Hỏng panel / màn hình hiển thị nứt vỡ, không lên nguồn')}
                                 className="px-1.5 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 rounded transition cursor-pointer"
                               >
-                                🏷️ Hỏng màn hình/nguồn
+                                Hỏng màn hình/nguồn
                               </button>
                             </div>
                           </td>
@@ -1312,7 +1385,7 @@ export default function Disposals() {
                               type="button"
                               onClick={() => handleRemoveProposalItem(item.assetId)}
                               title="Loại bỏ tài sản này khỏi bảng tổng hợp"
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1328,7 +1401,7 @@ export default function Disposals() {
                   <button
                     type="button"
                     onClick={() => setProposalStep(1)}
-                    className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer flex items-center gap-1.5"
                   >
                     <span>← Quay lại chọn thêm tài sản</span>
                   </button>
@@ -1337,7 +1410,7 @@ export default function Disposals() {
                     <button
                       type="button"
                       onClick={() => setShowCreateProposalModal(false)}
-                      className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                      className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                     >
                       Hủy bỏ
                     </button>
@@ -1345,7 +1418,7 @@ export default function Disposals() {
                     <button
                       type="submit"
                       disabled={proposalItems.length === 0}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition cursor-pointer"
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
                       <span>Gửi Bảng Tổng Hợp Đề Xuất ({proposalItems.length} tài sản)</span>
@@ -1453,13 +1526,13 @@ export default function Disposals() {
                 <button
                   type="button"
                   onClick={() => setShowInspectionModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow"
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-bold shadow"
                 >
                   Lưu Biên Bản Thẩm Định
                 </button>
@@ -1525,13 +1598,13 @@ export default function Disposals() {
                 <button
                   type="button"
                   onClick={() => setShowCreateCampaignModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow"
                 >
                   Ban Hành Thông Báo
                 </button>
@@ -1574,9 +1647,9 @@ export default function Disposals() {
                     inspectorTitle: 'CÁN BỘ KIỂM TRA KỸ THUẬT CNTT',
                     inspectorName: 'KTV. Phan Thanh Hoàn'
                   })}
-                  className="px-2 py-1 bg-blue-100 text-blue-800 rounded-lg font-bold text-[11px] hover:bg-blue-200 cursor-pointer"
+                  className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md font-bold text-[11px] hover:bg-blue-200 cursor-pointer"
                 >
-                  💻 Tổ CNTT
+                  Tổ CNTT
                 </button>
                 <button
                   type="button"
@@ -1587,9 +1660,9 @@ export default function Disposals() {
                     inspectorTitle: 'CÁN BỘ KIỂM TRA KỸ THUẬT TBYT',
                     inspectorName: 'DS. Mai Thị Tính'
                   })}
-                  className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px] hover:bg-emerald-200 cursor-pointer"
+                  className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md font-bold text-[11px] hover:bg-emerald-200 cursor-pointer"
                 >
-                  🩺 Khoa Dược (TBYT)
+                  Khoa Dược (TBYT)
                 </button>
                 <button
                   type="button"
@@ -1600,9 +1673,9 @@ export default function Disposals() {
                     inspectorTitle: 'CÁN BỘ KIỂM TRA CSVC / HÀNH CHÍNH',
                     inspectorName: 'Trưởng phòng TCHC'
                   })}
-                  className="px-2 py-1 bg-amber-100 text-amber-800 rounded-lg font-bold text-[11px] hover:bg-amber-200 cursor-pointer"
+                  className="px-2 py-1 bg-amber-100 text-amber-800 rounded-md font-bold text-[11px] hover:bg-amber-200 cursor-pointer"
                 >
-                  🏢 Phòng TCHC
+                  Phòng TCHC
                 </button>
               </div>
 
@@ -1733,13 +1806,13 @@ export default function Disposals() {
                 <button
                   type="button"
                   onClick={() => setShowDisposalSignaturesModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Đóng
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Lưu Cấu Hình Người Ký
                 </button>

@@ -171,9 +171,11 @@ export default function Departments() {
 
         <button 
           onClick={handleOpenAdd}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition cursor-pointer"
+          title="Thêm Khoa / Phòng mới"
+          className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 rounded-md text-xs sm:text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Thêm Khoa / Phòng mới
+          <Plus className="w-4 h-4" />
+          <span>Thêm ĐV</span>
         </button>
       </div>
 
@@ -236,7 +238,95 @@ export default function Departments() {
           isEmpty={filteredDepts.length === 0}
           emptyMessage="Không tìm thấy khoa phòng nào phù hợp."
         >
-          <div className="overflow-x-auto">
+          {/* Mobile Card View (< md) */}
+          <div className="md:hidden divide-y divide-slate-100">
+            {!loading &&
+              filteredDepts.map((item) => {
+                const bd = item.assetBreakdown;
+                const count = bd?.total ?? item._count?.assets ?? 0;
+                return (
+                  <div key={item.id} className="p-3.5 space-y-2 bg-white">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 font-mono text-[11px] font-medium text-blue-700">
+                          {item.code}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                            item.location === 'Cơ sở 2'
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                          }`}
+                        >
+                          {item.location}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/assets?departmentId=${item.id}`)}
+                        className="shrink-0 inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 rounded-md font-semibold text-xs tabular-nums cursor-pointer"
+                      >
+                        <span>{count.toLocaleString('vi-VN')} TS</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <div className="font-heading text-sm font-semibold text-slate-900 leading-snug">
+                      {item.name}
+                    </div>
+                    {item.description && (
+                      <div className="text-xs text-slate-500 leading-snug">{item.description}</div>
+                    )}
+
+                    {bd && count > 0 && (
+                      <div className="flex flex-wrap items-center gap-1 text-[11px] tabular-nums">
+                        {bd.duoc > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Dược: {bd.duoc}
+                          </span>
+                        )}
+                        {bd.cntt > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            CNTT: {bd.cntt}
+                          </span>
+                        )}
+                        {bd.tchcHc > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                            HC: {bd.tchcHc}
+                          </span>
+                        )}
+                        {bd.tchcMe > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-800 border border-orange-200">
+                            M&amp;E: {bd.tchcMe}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(item)}
+                        className="flex-1 min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-blue-50 text-blue-700 text-xs font-semibold cursor-pointer"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        <span>Sửa thông tin</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id, item.name)}
+                        className="min-h-[38px] px-3 py-1.5 rounded-md border border-rose-200 bg-rose-50/70 text-rose-700 text-xs font-medium cursor-pointer"
+                        title="Xóa khoa phòng"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
               <thead className="text-[11px] text-slate-600 uppercase tracking-wider bg-slate-50/90 border-b border-slate-200 font-heading font-semibold">
                 <tr>
@@ -324,7 +414,7 @@ export default function Departments() {
                             type="button"
                             onClick={() => navigate(`/assets?departmentId=${item.id}`)}
                             title={`Mở danh sách ${count} tài sản của ${item.name}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 rounded-full font-semibold text-xs tabular-nums transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 rounded-md font-semibold text-xs tabular-nums transition cursor-pointer"
                           >
                             <span>{count.toLocaleString('vi-VN')} tài sản</span>
                             <ExternalLink className="w-3 h-3" />
@@ -448,13 +538,13 @@ export default function Departments() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow"
                 >
                   {editingDept ? 'Cập nhật' : 'Thêm mới'}
                 </button>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -41,7 +41,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import DataTableShell, { useTablePrefs } from '../components/ui/DataTableShell';
 import AssetQuickDrawer from '../components/AssetQuickDrawer';
 
-const DONUT_COLORS = ['#059669', '#1E40AF', '#D97706', '#EA580C', '#0D9488', '#64748B'];
+const DONUT_COLORS = ['#0891B2', '#059669', '#D97706', '#E11D48', '#0284C7', '#64748B'];
 
 interface DivisionCardProps {
   title: string;
@@ -166,6 +166,33 @@ export default function Dashboard() {
   const isAdmin = user?.role === 'ADMIN';
   const canManageAssets = isAdmin || isDuoc || isCntt || isTchc;
   const canAccessMedicalOps = isAdmin || isViewer || isDuoc || isDept;
+
+  const [liteMode, setLiteMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('qlts_ui_lite_mode');
+      if (saved === '1') return true;
+      if (saved === '0') return false;
+      return user?.role === 'DEPARTMENT';
+    } catch {
+      return false;
+    }
+  });
+  const [showAnalyticsInLite, setShowAnalyticsInLite] = useState(false);
+  const [deptSearch, setDeptSearch] = useState('');
+
+  useEffect(() => {
+    const syncLiteMode = () => {
+      try {
+        const saved = localStorage.getItem('qlts_ui_lite_mode');
+        if (saved === '1') setLiteMode(true);
+        else if (saved === '0') setLiteMode(false);
+        else setLiteMode(user?.role === 'DEPARTMENT');
+      } catch {}
+    };
+    syncLiteMode();
+    window.addEventListener('qlts:litemode', syncLiteMode);
+    return () => window.removeEventListener('qlts:litemode', syncLiteMode);
+  }, [user?.role]);
 
   const { data: statsData, isFetching: statsFetching } = useQuery<any>({
     queryKey: ['dashboard-stats'],
@@ -301,6 +328,94 @@ export default function Dashboard() {
   const openTickets = (maintSummary?.pending || 0) + (maintSummary?.inProgress || 0);
   const totalCalibAlerts = (calibrationAlerts?.overdue || 0) + (calibrationAlerts?.upcoming || 0);
 
+  const bentoDivisionBars = useMemo(() => {
+    const total = stats.totalAssets || 0;
+    if (isAdmin || isViewer) {
+      return [
+        {
+          key: 'DUOC',
+          label: 'Khối TBYT · Khoa Dược',
+          count: stats.managingUnits?.duoc?.total ?? 0,
+          healthy: stats.managingUnits?.duoc?.dangSuDung ?? 0,
+          issue: stats.managingUnits?.duoc?.baoTri ?? 0,
+          barColor: 'bg-[#0891B2]',
+          onClick: () => navigate('/assets?managingUnit=DUOC'),
+        },
+        {
+          key: 'CNTT',
+          label: 'Khối CNTT · IT',
+          count: stats.managingUnits?.cntt?.total ?? 0,
+          healthy: stats.managingUnits?.cntt?.dangSuDung ?? 0,
+          issue: stats.managingUnits?.cntt?.baoTri ?? 0,
+          barColor: 'bg-[#059669]',
+          onClick: () => navigate('/assets?managingUnit=CNTT'),
+        },
+        {
+          key: 'TCHC_HC',
+          label: 'TCHC · Hành chính',
+          count: stats.managingUnits?.tchcHc?.total ?? stats.managingUnits?.tchc?.hanhchinh ?? 0,
+          healthy: stats.managingUnits?.tchcHc?.dangSuDung ?? stats.managingUnits?.tchc?.hanhchinh ?? 0,
+          issue: stats.managingUnits?.tchcHc?.baoTri ?? 0,
+          barColor: 'bg-sky-600',
+          onClick: () => navigate('/assets?managingUnit=TCHC&buildingAsset=0'),
+        },
+        {
+          key: 'TCHC_ME',
+          label: 'TCHC · Cơ điện M&E',
+          count: stats.managingUnits?.tchcTn?.total ?? stats.managingUnits?.tchc?.toanha ?? 0,
+          healthy: stats.managingUnits?.tchcTn?.dangSuDung ?? stats.managingUnits?.tchc?.toanha ?? 0,
+          issue: stats.managingUnits?.tchcTn?.baoTri ?? 0,
+          barColor: 'bg-amber-500',
+          onClick: () => navigate('/assets?managingUnit=TCHC&buildingAsset=1'),
+        },
+      ];
+    }
+
+    if (isDept) {
+      return [
+        {
+          key: 'DUOC',
+          label: 'Trang thiết bị Y tế (Dược)',
+          count: stats.managingUnits?.duoc?.total ?? 0,
+          healthy: stats.managingUnits?.duoc?.dangSuDung ?? 0,
+          issue: stats.managingUnits?.duoc?.baoTri ?? 0,
+          barColor: 'bg-[#0891B2]',
+          onClick: () => navigate('/assets?managingUnit=DUOC'),
+        },
+        {
+          key: 'CNTT',
+          label: 'Thiết bị CNTT (IT)',
+          count: stats.managingUnits?.cntt?.total ?? 0,
+          healthy: stats.managingUnits?.cntt?.dangSuDung ?? 0,
+          issue: stats.managingUnits?.cntt?.baoTri ?? 0,
+          barColor: 'bg-[#059669]',
+          onClick: () => navigate('/assets?managingUnit=CNTT'),
+        },
+        {
+          key: 'TCHC',
+          label: 'Văn phòng & Điện (TCHC)',
+          count: stats.managingUnits?.tchc?.total ?? 0,
+          healthy: stats.managingUnits?.tchc?.dangSuDung ?? 0,
+          issue: stats.managingUnits?.tchc?.baoTri ?? 0,
+          barColor: 'bg-amber-500',
+          onClick: () => navigate('/assets?managingUnit=TCHC&buildingAsset=0'),
+        },
+      ];
+    }
+
+    const palette = ['bg-[#0891B2]', 'bg-[#059669]', 'bg-sky-600', 'bg-amber-500'];
+    return categoryData.slice(0, 4).map((c, idx) => ({
+      key: c.key || String(idx),
+      label: c.name || 'Nhóm thiết bị',
+      count: c.count || 0,
+      healthy: c.count || 0,
+      issue: 0,
+      barColor: palette[idx % palette.length],
+      onClick: () => navigateByCategoryName(c.name || '', c.key),
+      pctOverride: total > 0 ? Math.round(((c.count || 0) / total) * 100) : 0,
+    }));
+  }, [stats, categoryData, isAdmin, isViewer, isDept, navigate]);
+
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-by-category'] });
@@ -313,6 +428,12 @@ export default function Dashboard() {
 
   const handleOpenQuickSearch = () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+  };
+
+  const handleDeptSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = deptSearch.trim();
+    navigate(q ? `/assets?search=${encodeURIComponent(q)}` : '/assets');
   };
 
   const navigateByCategoryName = (name: string, key?: string) => {
@@ -334,282 +455,654 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 pb-10">
-      {/* 1. COMPACT COMMAND HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/80">
-              {isDept ? user?.department?.code || 'Khoa / Phòng' : 'CDC Đà Nẵng'}
-            </span>
-            <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
-              {isDept
-                ? `Tài sản · ${user?.department?.name || user?.fullName}`
-                : isCntt
-                ? 'Điều hành Khối Thiết bị CNTT'
-                : isDuoc
-                ? 'Điều hành Trang thiết bị Y tế'
-                : isTchc
-                ? 'Điều hành Khối TCHC & Hạ tầng Tòa nhà'
-                : 'Tổng Quan Quản Trị Tài Sản'}
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
-            Theo dõi {(stats.totalAssets || 0).toLocaleString('vi-VN')} thiết bị · Tổng nguyên giá{' '}
-            <strong className="text-slate-700">
-              {stats.totalValue ? (stats.totalValue / 1e9).toFixed(2) : '0.00'} tỷ đ
-            </strong>{' '}
-            · Sẵn sàng <strong className="text-emerald-700">{readyPct}%</strong>
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handleOpenQuickSearch}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer"
-          >
-            <Search className="w-3.5 h-3.5 text-slate-400" />
-            <span>Tìm nhanh</span>
-            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-slate-50 border border-slate-200 rounded text-slate-500">
-              Ctrl K
-            </kbd>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/inventory')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer"
-          >
-            <ClipboardCheck className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Kiểm kê</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate(user?.role !== 'VIEWER' ? '/maintenance?quickReport=1' : '/maintenance')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100/90 border border-amber-300/80 rounded-xl hover:bg-amber-200/80 transition cursor-pointer shadow-2xs"
-            title={user?.role !== 'VIEWER' ? 'Mở nhanh phiếu báo hỏng thiết bị' : 'Xem danh sách sửa chữa'}
-          >
-            <Wrench className="w-3.5 h-3.5 text-amber-700" />
-            <span>{user?.role !== 'VIEWER' ? 'Báo hỏng nhanh' : 'Sửa chữa'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/qr-scanner')}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer"
-            title="Quét mã QR"
-          >
-            <QrCode className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Quét QR</span>
-          </button>
-
-          {canManageAssets && (
-            <button
-              type="button"
-              onClick={() => navigate('/assets/new')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 shadow-xs transition cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Thêm tài sản</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleRefresh}
-            title="Làm mới số liệu"
-            className="p-1.5 text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-4 h-4 ${statsFetching ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* 2. TOP KPI & ACTIONABLE ALERTS ROW (4 Focused Cards) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/assets')}
-          className="text-left bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 hover:shadow-sm transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>{isDept ? 'Tổng tài sản khoa' : 'Tổng danh mục'}</span>
-            <Layers className="w-4 h-4 text-blue-600" />
-          </div>
-          <div className="font-heading text-2xl font-bold text-slate-900 tabular-nums mt-1">
-            {(stats.totalAssets || 0).toLocaleString('vi-VN')}
-          </div>
-          <div className="flex items-center justify-between text-[11px] mt-1.5">
-            <span className="text-slate-500 tabular-nums">
-              {stats.totalValue ? (stats.totalValue / 1e9).toFixed(2) : '0.00'} tỷ đ
-            </span>
-            <span className="font-medium text-blue-700">Danh mục →</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/assets?status=DANG_SU_DUNG')}
-          className="text-left bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 hover:shadow-sm transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Đang sử dụng tốt</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="font-heading text-2xl font-bold text-emerald-700 tabular-nums">
-              {(stats.dangSuDung || 0).toLocaleString('vi-VN')}
-            </span>
-            <span className="text-xs font-semibold text-emerald-600 tabular-nums">{readyPct}%</span>
-          </div>
-          <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${readyPct}%` }} />
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/assets?status=HONG,BAO_TRI')}
-          className="text-left bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-300 hover:shadow-sm transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Hỏng / Bảo trì</span>
-            <Wrench className="w-4 h-4 text-rose-600" />
-          </div>
-          <div className="font-heading text-2xl font-bold text-rose-700 tabular-nums mt-1">
-            {(stats.baoTri || 0).toLocaleString('vi-VN')}
-          </div>
-          <div className="flex items-center justify-between text-[11px] mt-1.5">
-            <span className="text-slate-500 tabular-nums">
-              {openTickets > 0 ? `${openTickets} phiếu đang xử lý` : 'Kiểm tra thiết bị lỗi'}
-            </span>
-            <span className="font-medium text-rose-700">Lọc danh sách →</span>
-          </div>
-        </button>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <button
-            type="button"
-            onClick={() => navigate('/assets?status=CHO_THANH_LY')}
-            className="text-left w-full cursor-pointer group"
-          >
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Chờ thanh lý</span>
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-            </div>
-            <div className="flex items-baseline justify-between gap-2 mt-1">
-              <span className="font-heading text-2xl font-bold text-amber-700 tabular-nums">
-                {(stats.choThanhLy || 0).toLocaleString('vi-VN')}
-              </span>
-              <span className="text-[11px] text-amber-700 font-medium group-hover:underline">
-                Xem đề xuất →
-              </span>
-            </div>
-          </button>
-
-          <div className="pt-1.5 mt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            {canAccessMedicalOps ? (
-              <button
-                type="button"
-                onClick={() => navigate('/calibration')}
-                className="inline-flex items-center gap-1 text-slate-600 hover:text-blue-700 font-medium cursor-pointer"
-              >
-                <Award className="w-3.5 h-3.5 text-teal-600" />
-                <span className="tabular-nums">
-                  {totalCalibAlerts > 0
-                    ? `${calibrationAlerts?.overdue || 0} quá hạn · ${calibrationAlerts?.upcoming || 0} sắp hạn KĐ`
-                    : 'Kiểm định TBYT đạt chuẩn'}
+      {/* =================================================================== */}
+      {/* PA 4: ROLE-ADAPTIVE PORTAL CHO RIÊNG TÀI KHOẢN KHOA / PHÒNG (LITE)  */}
+      {/* =================================================================== */}
+      {isDept && liteMode ? (
+        <>
+          <section className="bg-white rounded-2xl border border-slate-200/85 p-5 sm:p-7 shadow-2xs">
+            <div className="max-w-3xl mx-auto text-center space-y-2.5">
+              <div className="inline-flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200/80">
+                  {user?.department?.code || 'Khoa / Phòng'}
                 </span>
-              </button>
-            ) : (
+                <span className="text-[11px] text-slate-400">Cổng tác nghiệp Khoa/Phòng</span>
+              </div>
+
+              <h1 className="font-heading text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                Cổng Thiết Bị · {user?.department?.name || user?.fullName}
+              </h1>
+
+              <p className="text-xs sm:text-[13px] text-slate-500 tabular-nums">
+                Đang quản lý <strong className="text-slate-800">{(stats.totalAssets || 0).toLocaleString('vi-VN')}</strong> tài sản ·{' '}
+                <strong className="text-emerald-700">{(stats.dangSuDung || 0).toLocaleString('vi-VN')} đang tốt ({readyPct}%)</strong> ·{' '}
+                <strong className={openTickets > 0 ? 'text-amber-700' : 'text-slate-700'}>
+                  {openTickets} phiếu sửa đang mở
+                </strong>
+              </p>
+
+              {/* Thanh tìm kiếm lớn ở trung tâm */}
+              <form onSubmit={handleDeptSearchSubmit} className="max-w-2xl mx-auto pt-2 flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={deptSearch}
+                    onChange={(e) => setDeptSearch(e.target.value)}
+                    placeholder="Tìm tên thiết bị, mã tài sản, người giữ, số phòng tại Khoa..."
+                    className="w-full pl-10 pr-20 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-sm text-slate-800 outline-none focus:border-cyan-600 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleOpenQuickSearch}
+                    className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] font-mono text-slate-500 hover:text-slate-800 absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer"
+                    title="Mở tra cứu nhanh Ctrl+K"
+                  >
+                    Ctrl K
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-cyan-700 hover:bg-cyan-800 text-white rounded-md text-xs sm:text-sm font-semibold shadow-xs transition cursor-pointer shrink-0"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Tìm thiết bị</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Lưới 2x2: 4 Nhiệm vụ trọng tâm cho cán bộ Khoa/Phòng */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-w-4xl mx-auto mt-6">
+              {/* Card 1: Quét QR & Báo hỏng */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/40 to-white flex flex-col justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                    <QrCode className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="font-heading text-sm sm:text-[15px] font-bold text-slate-900">
+                      Quét QR &amp; Báo hỏng nhanh
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      Dùng camera quét tem QR trên thân máy hoặc tạo phiếu báo hỏng (kèm ảnh lỗi / UltraViewer).
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/qr-scanner')}
+                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Quét mã QR</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/maintenance?quickReport=1')}
+                    className="flex-1 min-w-[130px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 rounded-md text-xs font-semibold transition cursor-pointer"
+                  >
+                    <Wrench className="w-4 h-4 text-amber-700" />
+                    <span>Báo hỏng ngay</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Theo dõi phiếu sửa */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-cyan-200/80 bg-gradient-to-br from-cyan-50/40 to-white flex flex-col justify-between gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3.5 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center shrink-0">
+                      <Wrench className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="font-heading text-sm sm:text-[15px] font-bold text-slate-900">
+                        Theo dõi phiếu sửa chữa
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Xem trạng thái tiếp nhận, cán bộ kỹ thuật đang xử lý và lịch sử bảo trì của Khoa.
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border tabular-nums ${
+                      openTickets > 0
+                        ? 'bg-cyan-100 text-cyan-800 border-cyan-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {openTickets} đang mở
+                  </span>
+                </div>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/maintenance')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-cyan-700 hover:bg-cyan-800 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+                  >
+                    <span>Xem phiếu của Khoa</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 3: Kiểm kê C53-HD */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-50/40 to-white flex flex-col justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                    <ClipboardCheck className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="font-heading text-sm sm:text-[15px] font-bold text-slate-900">
+                      Kiểm kê tại Khoa (C53-HD)
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      Đối chiếu sổ sách và xác nhận hiện trạng sử dụng tài sản được giao cho Khoa theo kỳ.
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/inventory')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+                  >
+                    <span>Mở sổ kiểm kê Khoa</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 4: Danh mục thiết bị Khoa */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/40 to-white flex flex-col justify-between gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3.5 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Layers className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="font-heading text-sm sm:text-[15px] font-bold text-slate-900">
+                        Danh mục thiết bị Khoa
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Tra cứu lý lịch, vị trí phòng, người giữ tài sản thuộc khối TBYT, CNTT và TCHC.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 tabular-nums">
+                    {(stats.totalAssets || 0).toLocaleString('vi-VN')}
+                  </span>
+                </div>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/assets')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+                  >
+                    <span>Xem toàn bộ danh mục</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          {/* =================================================================== */}
+          {/* PA 2: LIGHT MINIMAL + BENTO MODULAR WORKBENCH                        */}
+          {/* =================================================================== */}
+          {/* 1. COMPACT COMMAND HEADER */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200/80">
+                  {isDept ? user?.department?.code || 'Khoa / Phòng' : 'CDC Đà Nẵng'}
+                </span>
+                <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+                  {isDept
+                    ? `Tài sản · ${user?.department?.name || user?.fullName}`
+                    : isCntt
+                    ? 'Điều hành Khối Thiết bị CNTT'
+                    : isDuoc
+                    ? 'Điều hành Trang thiết bị Y tế'
+                    : isTchc
+                    ? 'Điều hành Khối TCHC & Hạ tầng Tòa nhà'
+                    : 'Tổng Quan Quản Trị Tài Sản'}
+                </h1>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
+                Theo dõi {(stats.totalAssets || 0).toLocaleString('vi-VN')} thiết bị · Tổng nguyên giá{' '}
+                <strong className="text-slate-700">
+                  {stats.totalValue ? (stats.totalValue / 1e9).toFixed(2) : '0.00'} tỷ đ
+                </strong>{' '}
+                · Sẵn sàng <strong className="text-emerald-700">{readyPct}%</strong>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => navigate('/depreciation')}
-                className="inline-flex items-center gap-1 text-slate-600 hover:text-blue-700 font-medium cursor-pointer"
+                onClick={handleOpenQuickSearch}
+                title="Tìm nhanh tài sản (Ctrl + K)"
+                aria-label="Tìm nhanh tài sản"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition cursor-pointer"
               >
-                <TrendingDown className="w-3.5 h-3.5 text-slate-500" />
-                <span>Xem báo cáo khấu hao →</span>
+                <Search className="w-4 h-4 text-slate-500" />
+                <span className="hidden lg:inline">Tìm</span>
               </button>
-            )}
+
+              <button
+                type="button"
+                onClick={() => navigate('/inventory')}
+                title="Kiểm kê tài sản C53-HD"
+                aria-label="Kiểm kê tài sản"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition cursor-pointer"
+              >
+                <ClipboardCheck className="w-4 h-4 text-teal-600" />
+                <span className="hidden xl:inline">Kiểm kê</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate(user?.role !== 'VIEWER' ? '/maintenance?quickReport=1' : '/maintenance')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100/90 border border-amber-300/80 rounded-md hover:bg-amber-200/80 transition cursor-pointer shadow-2xs"
+                title={user?.role !== 'VIEWER' ? 'Mở nhanh phiếu báo hỏng thiết bị' : 'Xem danh sách sửa chữa'}
+              >
+                <Wrench className="w-3.5 h-3.5 text-amber-700" />
+                <span>{user?.role !== 'VIEWER' ? 'Báo hỏng' : 'Sửa chữa'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/qr-scanner')}
+                className="p-2 text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition cursor-pointer"
+                title="Quét mã QR thiết bị"
+                aria-label="Quét mã QR"
+              >
+                <QrCode className="w-4 h-4 text-slate-600" />
+              </button>
+
+              {canManageAssets && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/assets/new')}
+                  title="Thêm tài sản mới"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-cyan-700 rounded-md hover:bg-cyan-800 shadow-2xs transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Thêm TS</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleRefresh}
+                title="Làm mới số liệu"
+                aria-label="Làm mới số liệu"
+                className="p-2 text-slate-500 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:text-slate-800 transition cursor-pointer"
+              >
+                <RefreshCw className={`w-4 h-4 ${statsFetching ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* 3. DIVISION BREAKDOWN (4 Clear Autonomous Cards for Admin, 3 for Dept, 1 Strip for Manager) */}
-      {isAdmin && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          <DivisionCard
-            title="Khối TBYT"
-            badgeText="Khoa Dược quản lý"
-            subtitle="Thiết bị y tế chuyên dụng"
-            count={stats.managingUnits?.duoc?.total ?? 0}
-            totalBase={stats.totalAssets || 0}
-            healthyCount={stats.managingUnits?.duoc?.dangSuDung ?? 0}
-            issueCount={stats.managingUnits?.duoc?.baoTri ?? 0}
-            unitText="thiết bị"
-            accentClass="border-l-emerald-600"
-            barColorClass="bg-emerald-600"
-            iconBg="bg-emerald-50 text-emerald-700"
-            icon={Stethoscope}
-            onClick={() => navigate('/assets?managingUnit=DUOC')}
-          />
+          {/* 2. BENTO ROW 1: TOTAL ASSETS + HORIZONTAL BARS (7 cols) & HEALTH DONUT (5 cols) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Left Bento Card: Total Assets & Division Proportion Bars */}
+            <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/85 p-5 flex flex-col justify-between gap-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium text-slate-500">
+                    {isDept ? 'Tổng tài sản của Khoa' : 'Tổng tài sản toàn hệ thống'}
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2.5 flex-wrap">
+                    <span className="font-heading text-3xl sm:text-4xl font-bold text-slate-900 tabular-nums tracking-tight">
+                      {(stats.totalAssets || 0).toLocaleString('vi-VN')}
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 tabular-nums">
+                      {readyPct}% sẵn sàng
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">
+                    Tổng nguyên giá
+                  </div>
+                  <div className="font-heading text-lg font-bold text-cyan-800 tabular-nums mt-0.5">
+                    {stats.totalValue ? (stats.totalValue / 1e9).toFixed(2) : '0.00'} tỷ đ
+                  </div>
+                </div>
+              </div>
 
-          <DivisionCard
-            title="Khối CNTT"
-            badgeText="Tổ CNTT quản lý"
-            subtitle="Máy tính, máy in, mạng 16 khoa"
-            count={stats.managingUnits?.cntt?.total ?? 0}
-            totalBase={stats.totalAssets || 0}
-            healthyCount={stats.managingUnits?.cntt?.dangSuDung ?? 0}
-            issueCount={stats.managingUnits?.cntt?.baoTri ?? 0}
-            unitText="thiết bị"
-            accentClass="border-l-blue-700"
-            barColorClass="bg-blue-700"
-            iconBg="bg-blue-50 text-blue-700"
-            icon={Monitor}
-            onClick={() => navigate('/assets?managingUnit=CNTT')}
-          />
+              <div className="space-y-3 pt-1 border-t border-slate-100">
+                {bentoDivisionBars.map((row) => {
+                  const totalBase = stats.totalAssets || 1;
+                  const sharePct =
+                    'pctOverride' in row && typeof row.pctOverride === 'number'
+                      ? row.pctOverride
+                      : Math.round((row.count / totalBase) * 100);
+                  const rowHealthyPct = row.count > 0 ? Math.round((row.healthy / row.count) * 100) : 100;
+                  return (
+                    <button
+                      key={row.key}
+                      type="button"
+                      onClick={row.onClick}
+                      className="w-full text-left group hover:bg-slate-50/90 rounded-lg p-1.5 -mx-1.5 transition cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs mb-1">
+                        <span className="font-medium text-slate-700 group-hover:text-cyan-800 truncate">
+                          {row.label}
+                        </span>
+                        <span className="inline-flex items-center gap-2 shrink-0 tabular-nums">
+                          {row.issue > 0 && (
+                            <span className="text-[11px] font-semibold text-rose-700">
+                              {row.issue} cần XL
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-400">({rowHealthyPct}% tốt)</span>
+                          <span className="font-heading font-bold text-slate-900 min-w-[44px] text-right">
+                            {row.count.toLocaleString('vi-VN')}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${row.barColor}`}
+                          style={{ width: `${Math.max(sharePct, row.count > 0 ? 3 : 0)}%` }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          <DivisionCard
-            title="TCHC · Hành chính"
-            badgeText="Nội thất & Gia dụng"
-            subtitle="Bàn ghế, tủ kệ, gia dụng 16 khoa"
-            count={stats.managingUnits?.tchcHc?.total ?? stats.managingUnits?.tchc?.hanhchinh ?? 0}
-            totalBase={stats.totalAssets || 0}
-            healthyCount={
-              stats.managingUnits?.tchcHc?.dangSuDung ?? stats.managingUnits?.tchc?.hanhchinh ?? 0
-            }
-            issueCount={stats.managingUnits?.tchcHc?.baoTri ?? 0}
-            unitText="tài sản"
-            accentClass="border-l-amber-600"
-            barColorClass="bg-amber-500"
-            iconBg="bg-amber-50 text-amber-700"
-            icon={Building2}
-            onClick={() => navigate('/assets?managingUnit=TCHC&buildingAsset=0')}
-          />
+            {/* Right Bento Card: Health Donut & Alerts */}
+            <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/85 p-5 flex flex-col justify-between gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="font-heading text-sm font-semibold text-slate-900">
+                    Tình trạng &amp; Vận hành
+                  </h2>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Bấm từng trạng thái để lọc nhanh</p>
+                </div>
+                {canAccessMedicalOps ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/calibration')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50/70 hover:bg-cyan-50 text-[11px] font-medium text-slate-700 hover:text-cyan-800 transition cursor-pointer"
+                  >
+                    <Award className="w-3.5 h-3.5 text-cyan-700" />
+                    <span>Kiểm định</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/depreciation')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50/70 hover:bg-cyan-50 text-[11px] font-medium text-slate-700 hover:text-cyan-800 transition cursor-pointer"
+                  >
+                    <TrendingDown className="w-3.5 h-3.5 text-cyan-700" />
+                    <span>Khấu hao</span>
+                  </button>
+                )}
+              </div>
 
-          <DivisionCard
-            title="TCHC · Cơ điện M&E"
-            badgeText="Hạ tầng 9 tầng & KLCTN"
-            subtitle="Điện, HVAC, PCCC, Cấp thoát nước"
-            count={stats.managingUnits?.tchcTn?.total ?? stats.managingUnits?.tchc?.toanha ?? 0}
-            totalBase={stats.totalAssets || 0}
-            healthyCount={
-              stats.managingUnits?.tchcTn?.dangSuDung ?? stats.managingUnits?.tchc?.toanha ?? 0
-            }
-            issueCount={stats.managingUnits?.tchcTn?.baoTri ?? 0}
-            unitText="hạng mục"
-            accentClass="border-l-orange-600"
-            barColorClass="bg-orange-500"
-            iconBg="bg-orange-50 text-orange-700"
-            icon={Layers}
-            onClick={() => navigate('/assets?managingUnit=TCHC&buildingAsset=1')}
-          />
-        </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 items-center gap-3">
+                {/* Donut Chart */}
+                <div className="sm:col-span-5 relative h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={statusBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={42}
+                        outerRadius={58}
+                        paddingAngle={2.5}
+                        dataKey="count"
+                        nameKey="label"
+                      >
+                        {statusBreakdown.map((item, idx) => {
+                          const colorMap: Record<string, string> = {
+                            DANG_SU_DUNG: '#0891B2',
+                            HONG: '#E11D48',
+                            BAO_TRI: '#F59E0B',
+                            CHO_THANH_LY: '#EA580C',
+                            KHONG_SU_DUNG: '#94A3B8',
+                          };
+                          return <Cell key={item.key} fill={colorMap[item.key] || DONUT_COLORS[idx % DONUT_COLORS.length]} />;
+                        })}
+                      </Pie>
+                      <RechartsTooltip content={<CustomChartTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="font-heading text-lg font-bold text-slate-900 tabular-nums">
+                      {readyPct}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">Sẵn sàng</span>
+                  </div>
+                </div>
+
+                {/* Clickable Legend Rows */}
+                <div className="sm:col-span-7 space-y-1">
+                  {statusBreakdown.map((item) => {
+                    const pct = stats.totalAssets ? ((item.count / stats.totalAssets) * 100).toFixed(1) : '0.0';
+                    const dotColorMap: Record<string, string> = {
+                      DANG_SU_DUNG: 'bg-[#0891B2]',
+                      HONG: 'bg-rose-600',
+                      BAO_TRI: 'bg-amber-500',
+                      CHO_THANH_LY: 'bg-orange-500',
+                      KHONG_SU_DUNG: 'bg-slate-400',
+                    };
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => navigate(`/assets?status=${item.key}`)}
+                        className="w-full flex items-center justify-between text-xs px-2 py-1 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                      >
+                        <span className="inline-flex items-center gap-1.5 text-slate-700 font-medium truncate">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${dotColorMap[item.key] || item.dotColor}`} />
+                          <span className="truncate">{item.label}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 tabular-nums shrink-0">
+                          <span className="font-heading font-semibold text-slate-900">
+                            {item.count.toLocaleString('vi-VN')}
+                          </span>
+                          <span className="text-[11px] text-slate-400 w-9 text-right">{pct}%</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Micro Summary Footers */}
+              <div className="pt-2.5 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => navigate('/maintenance')}
+                  className="text-left p-2.5 rounded-xl bg-slate-50/90 hover:bg-amber-50/70 border border-slate-200/70 transition cursor-pointer"
+                >
+                  <div className="text-[11px] text-slate-500">Phiếu sửa chữa</div>
+                  <div className="font-heading font-semibold text-slate-900 tabular-nums mt-0.5">
+                    {maintSummary?.pending || 0} chờ · {maintSummary?.inProgress || 0} ĐXL
+                  </div>
+                </button>
+
+                {canAccessMedicalOps ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/calibration')}
+                    className="text-left p-2.5 rounded-xl bg-slate-50/90 hover:bg-cyan-50/70 border border-slate-200/70 transition cursor-pointer"
+                  >
+                    <div className="text-[11px] text-slate-500">Kiểm định 30 ngày</div>
+                    <div className="font-heading font-semibold text-slate-900 tabular-nums mt-0.5">
+                      {calibrationAlerts?.overdue || 0} quá hạn · {calibrationAlerts?.upcoming || 0} sắp hạn
+                    </div>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/inventory')}
+                    className="text-left p-2.5 rounded-xl bg-slate-50/90 hover:bg-cyan-50/70 border border-slate-200/70 transition cursor-pointer"
+                  >
+                    <div className="text-[11px] text-slate-500">Kiểm kê C53-HD</div>
+                    <div className="font-heading font-semibold text-cyan-800 mt-0.5">Mở bảng kiểm kê →</div>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. BENTO ROW 2: 2x2 QUICK ACTION TILES (5 cols) & 4 KPI ACTION TILES (7 cols) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* 4 Quick Shortcut Tiles (inspired by PA 2 demo) */}
+            <div className="lg:col-span-5 grid grid-cols-2 gap-3">
+              {[
+                {
+                  title: 'Quét mã QR',
+                  desc: 'Tra cứu lý lịch bằng camera',
+                  icon: QrCode,
+                  iconCls: 'bg-cyan-50 text-cyan-700',
+                  to: '/qr-scanner',
+                },
+                {
+                  title: !isViewer ? 'Ghi nhận sự cố' : 'Theo dõi sửa chữa',
+                  desc: !isViewer ? 'Báo hỏng kèm UltraViewer' : 'Danh sách sự cố thiết bị',
+                  icon: Wrench,
+                  iconCls: 'bg-amber-50 text-amber-700',
+                  to: !isViewer ? '/maintenance?quickReport=1' : '/maintenance',
+                },
+                {
+                  title: canAccessMedicalOps ? 'Lịch bảo trì ĐK' : 'Kiểm kê C53-HD',
+                  desc: canAccessMedicalOps ? 'Kế hoạch bảo dưỡng năm' : 'Xác nhận kiểm đếm thực tế',
+                  icon: ClipboardCheck,
+                  iconCls: 'bg-emerald-50 text-emerald-700',
+                  to: canAccessMedicalOps ? '/planned-maintenance' : '/inventory',
+                },
+                {
+                  title: 'Khấu hao & Thanh lý',
+                  desc: 'Theo dõi hao mòn hàng năm',
+                  icon: TrendingDown,
+                  iconCls: 'bg-slate-100 text-slate-700',
+                  to: '/depreciation',
+                },
+              ].map((tile) => {
+                const TileIcon = tile.icon;
+                return (
+                  <button
+                    key={tile.title}
+                    type="button"
+                    onClick={() => navigate(tile.to)}
+                    className="group text-left bg-white p-4 rounded-2xl border border-slate-200/85 hover:border-cyan-300 hover:shadow-sm transition cursor-pointer flex flex-col justify-between gap-2.5"
+                  >
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${tile.iconCls}`}>
+                      <TileIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-heading text-[13px] font-semibold text-slate-900 group-hover:text-cyan-800 transition-colors">
+                        {tile.title}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{tile.desc}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 4 Focused KPI Operational Metrics */}
+            <div className="lg:col-span-7 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/assets')}
+                className="text-left bg-white p-4 rounded-2xl border border-slate-200/85 hover:border-cyan-300 hover:shadow-sm transition cursor-pointer flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>{isDept ? 'Tổng tài sản khoa' : 'Tổng danh mục'}</span>
+                  <Layers className="w-4 h-4 text-cyan-700" />
+                </div>
+                <div className="font-heading text-2xl font-bold text-slate-900 tabular-nums mt-1">
+                  {(stats.totalAssets || 0).toLocaleString('vi-VN')}
+                </div>
+                <div className="flex items-center justify-between text-[11px] mt-1.5">
+                  <span className="text-slate-500 tabular-nums">
+                    {stats.totalValue ? (stats.totalValue / 1e9).toFixed(2) : '0.00'} tỷ đ
+                  </span>
+                  <span className="font-medium text-cyan-700">Mở danh mục →</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/assets?status=DANG_SU_DUNG')}
+                className="text-left bg-white p-4 rounded-2xl border border-slate-200/85 hover:border-emerald-300 hover:shadow-sm transition cursor-pointer flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Đang sử dụng tốt</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="font-heading text-2xl font-bold text-emerald-700 tabular-nums">
+                    {(stats.dangSuDung || 0).toLocaleString('vi-VN')}
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-600 tabular-nums">{readyPct}%</span>
+                </div>
+                <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${readyPct}%` }} />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/assets?status=HONG,BAO_TRI')}
+                className="text-left bg-white p-4 rounded-2xl border border-slate-200/85 hover:border-rose-300 hover:shadow-sm transition cursor-pointer flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Hỏng / Bảo trì</span>
+                  <Wrench className="w-4 h-4 text-rose-600" />
+                </div>
+                <div className="font-heading text-2xl font-bold text-rose-700 tabular-nums mt-1">
+                  {(stats.baoTri || 0).toLocaleString('vi-VN')}
+                </div>
+                <div className="flex items-center justify-between text-[11px] mt-1.5">
+                  <span className="text-slate-500 tabular-nums">
+                    {openTickets > 0 ? `${openTickets} phiếu đang xử lý` : 'Kiểm tra thiết bị lỗi'}
+                  </span>
+                  <span className="font-medium text-rose-700">Lọc danh sách →</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/assets?status=CHO_THANH_LY')}
+                className="text-left bg-white p-4 rounded-2xl border border-slate-200/85 hover:border-amber-300 hover:shadow-sm transition cursor-pointer flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Chờ thanh lý</span>
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="font-heading text-2xl font-bold text-amber-700 tabular-nums mt-1">
+                  {(stats.choThanhLy || 0).toLocaleString('vi-VN')}
+                </div>
+                <div className="flex items-center justify-between text-[11px] mt-1.5">
+                  <span className="text-slate-500 truncate">
+                    {canAccessMedicalOps && totalCalibAlerts > 0
+                      ? `${calibrationAlerts?.overdue || 0} KĐ quá hạn · ${calibrationAlerts?.upcoming || 0} sắp hạn`
+                      : 'Theo dõi đề xuất'}
+                  </span>
+                  <span className="font-medium text-amber-700 shrink-0">Xem →</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
-      {isDept && (
+      {/* 3. DIVISION BREAKDOWN (3 cards for Dept Kiosk, compact strip for Division Managers) */}
+      {isDept && liteMode && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <DivisionCard
             title="Thiết bị CNTT"
@@ -706,7 +1199,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => navigate('/assets')}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium transition cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+            className="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-800 text-white rounded-md text-xs font-medium transition cursor-pointer inline-flex items-center gap-1.5 shrink-0"
           >
             <span>Mở danh mục khối</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -714,18 +1207,35 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 4. ANALYTICS ROW (3 Clear Cards with Interactive Drill-down + Table Toggle) */}
+      {/* 4. ANALYTICS ROW (Collapsed by default in Lite Mode) */}
+      {liteMode && (
+        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <BarChart3 className="w-4 h-4 text-cyan-700 shrink-0" />
+            <span>Biểu đồ cơ cấu tài sản &amp; phân bổ khoa/phòng đang được thu gọn</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAnalyticsInLite((v) => !v)}
+            className="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition cursor-pointer shrink-0"
+          >
+            {showAnalyticsInLite ? 'Thu gọn biểu đồ' : 'Xem thêm biểu đồ thống kê'}
+          </button>
+        </div>
+      )}
+
+      {(!liteMode || showAnalyticsInLite) && (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-heading text-sm font-semibold text-slate-800">
-            Phân tích cơ cấu &amp; tình trạng vận hành
+            Phân tích cơ cấu theo nhóm &amp; đơn vị sử dụng
           </h2>
-          <div className="inline-flex p-0.5 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+          <div className="inline-flex p-0.5 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
             <button
               type="button"
               onClick={() => setChartViewMode('chart')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-                chartViewMode === 'chart' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                chartViewMode === 'chart' ? 'bg-cyan-700 text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5" />
@@ -734,8 +1244,8 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => setChartViewMode('table')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-                chartViewMode === 'table' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                chartViewMode === 'table' ? 'bg-cyan-700 text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               <Table2 className="w-3.5 h-3.5" />
@@ -744,7 +1254,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Card 1: Category / Division Share */}
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
             <div>
@@ -886,7 +1396,7 @@ export default function Dashboard() {
                     <RechartsTooltip content={<CustomChartTooltip />} cursor={{ fill: '#f8fafc' }} />
                     <Bar
                       dataKey="count"
-                      fill="#1E40AF"
+                      fill="#0891B2"
                       radius={[0, 6, 6, 0]}
                       className="cursor-pointer"
                       onClick={(entry: any) => {
@@ -919,95 +1429,9 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-
-          {/* Card 3: Asset Health & Operations Pipeline */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between gap-4">
-            <div>
-              <h3 className="font-heading font-semibold text-sm text-slate-900">
-                Sức khỏe tài sản &amp; Vận hành
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Phân bổ tình trạng kỹ thuật theo số liệu thực</p>
-
-              {/* Stacked Progress Overview */}
-              <div className="mt-3.5 h-3 w-full rounded-full bg-slate-100 overflow-hidden flex">
-                {statusBreakdown.map((item) => {
-                  const pct = stats.totalAssets ? (item.count / stats.totalAssets) * 100 : 0;
-                  if (pct <= 0) return null;
-                  return (
-                    <div
-                      key={item.key}
-                      className={`${item.barColor} h-full`}
-                      style={{ width: `${Math.max(pct, 0.8)}%` }}
-                      title={`${item.label}: ${item.count.toLocaleString('vi-VN')} (${pct.toFixed(1)}%)`}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="mt-3.5 space-y-2">
-                {statusBreakdown.map((item) => {
-                  const pct = stats.totalAssets ? ((item.count / stats.totalAssets) * 100).toFixed(1) : '0.0';
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => navigate(`/assets?status=${item.key}`)}
-                      className="w-full flex items-center justify-between text-xs px-2 py-1.5 -mx-2 rounded-lg hover:bg-slate-50 transition cursor-pointer"
-                    >
-                      <span className="inline-flex items-center gap-2 text-slate-700 font-medium">
-                        <span className={`w-2 h-2 rounded-full ${item.dotColor}`} />
-                        <span>{item.label}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-2 tabular-nums">
-                        <span className={`font-heading font-semibold ${item.textClass}`}>
-                          {item.count.toLocaleString('vi-VN')}
-                        </span>
-                        <span className="text-[11px] text-slate-400 w-10 text-right">{pct}%</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Maintenance & Calibration Micro Summary */}
-            <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => navigate('/maintenance')}
-                className="text-left p-2.5 rounded-xl bg-slate-50 hover:bg-amber-50/70 border border-slate-200/70 transition cursor-pointer"
-              >
-                <div className="text-[11px] text-slate-500">Phiếu sửa chữa</div>
-                <div className="font-heading font-semibold text-slate-900 tabular-nums mt-0.5">
-                  {maintSummary?.pending || 0} chờ · {maintSummary?.inProgress || 0} đang xử lý
-                </div>
-              </button>
-
-              {canAccessMedicalOps ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/calibration')}
-                  className="text-left p-2.5 rounded-xl bg-slate-50 hover:bg-teal-50/70 border border-slate-200/70 transition cursor-pointer"
-                >
-                  <div className="text-[11px] text-slate-500">Kiểm định 30 ngày</div>
-                  <div className="font-heading font-semibold text-slate-900 tabular-nums mt-0.5">
-                    {calibrationAlerts?.overdue || 0} quá hạn · {calibrationAlerts?.upcoming || 0} sắp hạn
-                  </div>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => navigate('/inventory')}
-                  className="text-left p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/70 transition cursor-pointer"
-                >
-                  <div className="text-[11px] text-slate-500">Kiểm kê C53-HD</div>
-                  <div className="font-heading font-semibold text-blue-700 mt-0.5">Mở bảng kiểm kê →</div>
-                </button>
-              )}
-            </div>
-          </div>
         </div>
       </div>
+      )}
 
       {/* 5. ACTIONABLE PRIORITY & RECENT ASSETS TABLE (Opens QuickDrawer in-place) */}
       <DataTableShell
@@ -1036,7 +1460,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setTableScope('ATTENTION')}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition cursor-pointer ${
                   tableScope === 'ATTENTION' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600'
                 }`}
               >
@@ -1046,7 +1470,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setTableScope('ALL')}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition cursor-pointer ${
                   tableScope === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
                 }`}
               >
@@ -1077,14 +1501,68 @@ export default function Dashboard() {
                 const qs = params.toString();
                 navigate(qs ? `/assets?${qs}` : '/assets');
               }}
-              className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition cursor-pointer whitespace-nowrap"
+              className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition cursor-pointer whitespace-nowrap"
             >
               Xem toàn bộ ({tableTotal.toLocaleString('vi-VN')}) →
             </button>
           </div>
         }
       >
-        <table className="w-full text-[13px] text-left border-collapse">
+        <div className="md:hidden divide-y divide-slate-100">
+          {tableAssets.map((a) => (
+            <div
+              key={a.id}
+              onClick={() => setQuickViewAssetId(a.id)}
+              className="p-3.5 space-y-2 hover:bg-slate-50/80 active:bg-slate-100/80 transition cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  <span className="font-mono text-xs font-semibold text-blue-700">{a.assetCode}</span>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-md font-medium text-[10px] border whitespace-nowrap ${
+                      a.managingUnit === 'DUOC'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                        : a.managingUnit === 'CNTT'
+                        ? 'bg-sky-50 text-sky-700 border-sky-200/80'
+                        : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                    }`}
+                  >
+                    {a.managingUnit === 'DUOC'
+                      ? 'Khoa Dược'
+                      : a.managingUnit === 'CNTT'
+                      ? 'Tổ CNTT'
+                      : 'TCHC'}
+                  </span>
+                </div>
+                <StatusBadge status={a.status} compact />
+              </div>
+
+              <div className="font-heading text-sm font-semibold text-slate-900 leading-snug">
+                {a.name}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1 text-xs text-slate-500">
+                <div className="min-w-0 truncate">
+                  {a.assignedTo || a.department?.name || 'Chưa giao cá nhân'} ·{' '}
+                  {a.locationDetail || a.floor || 'Cơ sở 1'}
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQuickViewAssetId(a.id);
+                  }}
+                  className="shrink-0 inline-flex items-center gap-1 min-h-[36px] px-2.5 py-1 rounded-md border border-slate-200 bg-white text-blue-700 text-xs font-medium cursor-pointer"
+                >
+                  <PanelRightOpen className="w-3.5 h-3.5" />
+                  <span>Xem</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <table className="hidden md:table w-full text-[13px] text-left border-collapse">
           <thead className="bg-slate-50/90 text-slate-500 font-heading text-[11px] font-semibold uppercase tracking-wider border-b border-slate-200/80">
             <tr>
               <th className={`${headPy} px-3.5 w-32 whitespace-nowrap`}>Mã tài sản</th>
@@ -1148,7 +1626,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setQuickViewAssetId(a.id)}
-                    className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-500 hover:text-blue-700 transition cursor-pointer"
+                    className="p-1.5 hover:bg-blue-50 rounded-md text-slate-500 hover:text-blue-700 transition cursor-pointer"
                     title="Mở bảng xem & cập nhật nhanh"
                   >
                     <PanelRightOpen className="w-4 h-4" />

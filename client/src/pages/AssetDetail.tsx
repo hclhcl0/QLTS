@@ -89,7 +89,7 @@ export default function AssetDetail() {
     return (
       <div className="p-12 text-center text-slate-500">
         <p>Không tìm thấy thiết bị yêu cầu.</p>
-        <button onClick={() => navigate('/assets')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm">
+        <button onClick={() => navigate('/assets')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm">
           Quay lại danh sách
         </button>
       </div>
@@ -101,7 +101,7 @@ export default function AssetDetail() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 cursor-pointer">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-md text-slate-500 cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
@@ -138,28 +138,28 @@ export default function AssetDetail() {
           <button
             type="button"
             onClick={() => navigate(`/maintenance?assetId=${asset.id}`)}
-            className="px-3 py-2 bg-amber-50/80 border border-amber-200 rounded-xl text-xs font-medium text-amber-800 hover:bg-amber-100/80 flex items-center gap-1.5 cursor-pointer transition"
+            className="px-3 py-2 bg-amber-50/80 border border-amber-200 rounded-md text-xs font-medium text-amber-800 hover:bg-amber-100/80 flex items-center gap-1.5 cursor-pointer transition"
           >
             <Wrench className="w-3.5 h-3.5" /> Báo hỏng
           </button>
           <button
             type="button"
             onClick={() => navigate(`/transfers?assetId=${asset.id}`)}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer transition"
+            className="px-3 py-2 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer transition"
           >
             <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" /> Điều chuyển
           </button>
           <button
             type="button"
             onClick={handlePrintQR}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer transition"
+            className="px-3 py-2 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer transition"
           >
             <Printer className="w-3.5 h-3.5 text-blue-700" /> In nhãn QR
           </button>
           <button
             type="button"
             onClick={() => navigate(`/assets/${asset.id}/edit`)}
-            className="px-3.5 py-2 bg-blue-700 text-white rounded-xl text-xs font-medium hover:bg-blue-800 flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            className="px-3.5 py-2 bg-blue-700 text-white rounded-md text-xs font-medium hover:bg-blue-800 flex items-center gap-1.5 shadow-xs transition cursor-pointer"
           >
             <Edit className="w-3.5 h-3.5" /> Sửa thông tin
           </button>
@@ -304,7 +304,7 @@ export default function AssetDetail() {
 
                   <button 
                     onClick={handlePrintQR}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow transition cursor-pointer mb-2"
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 shadow transition cursor-pointer mb-2"
                   >
                     <Printer className="w-3.5 h-3.5" /> In nhãn dán thiết bị
                   </button>
@@ -312,7 +312,7 @@ export default function AssetDetail() {
                   <a 
                     href={qrCodeImg || '#'}
                     download={`QR_${asset.assetCode}.png`}
-                    className="w-full py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    className="w-full py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" /> Tải file ảnh QR
                   </a>

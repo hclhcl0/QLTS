@@ -107,7 +107,7 @@ export default function AssetQuickDrawer({
             type="button"
             onClick={onClose}
             aria-label="Đóng bảng xem nhanh"
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
+            className="p-2 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -329,7 +329,7 @@ export default function AssetQuickDrawer({
             <button
               type="button"
               onClick={() => onNavigate(`/assets/${asset.id}`)}
-              className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-medium transition cursor-pointer"
+              className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-md text-xs font-medium transition cursor-pointer"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>Hồ sơ đầy đủ</span>
@@ -339,7 +339,7 @@ export default function AssetQuickDrawer({
               <button
                 type="button"
                 onClick={() => onNavigate(`/assets/${asset.id}/edit`)}
-                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-medium transition cursor-pointer"
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-md text-xs font-medium transition cursor-pointer"
               >
                 <Edit className="w-3.5 h-3.5" />
                 <span>Chỉnh sửa</span>
@@ -350,7 +350,7 @@ export default function AssetQuickDrawer({
               type="button"
               onClick={() => onNavigate(`/maintenance?assetId=${asset.id}`)}
               title="Lập phiếu báo hỏng"
-              className="flex items-center justify-center gap-1 px-3 py-2.5 border border-amber-200 bg-amber-50/70 hover:bg-amber-100/70 text-amber-800 rounded-xl text-xs font-medium transition cursor-pointer"
+              className="flex items-center justify-center gap-1 px-3 py-2.5 border border-amber-200 bg-amber-50/70 hover:bg-amber-100/70 text-amber-800 rounded-md text-xs font-medium transition cursor-pointer"
             >
               <Wrench className="w-3.5 h-3.5" />
               <span>Báo hỏng</span>
@@ -360,7 +360,7 @@ export default function AssetQuickDrawer({
               type="button"
               onClick={() => onNavigate(`/transfers?assetId=${asset.id}`)}
               title="Điều chuyển thiết bị"
-              className="flex items-center justify-center gap-1 px-3 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-medium transition cursor-pointer"
+              className="flex items-center justify-center gap-1 px-3 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-md text-xs font-medium transition cursor-pointer"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
               <span>Điều chuyển</span>

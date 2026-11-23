@@ -120,42 +120,42 @@ export default function DataTableShell({
       className={`bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden ${className}`}
     >
       {/* Unified Compact Table Utility Bar */}
-      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
+      <div className="px-3 sm:px-4 py-2.5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-slate-600 min-w-0">
           {title && (
             <span className="font-heading font-semibold text-slate-800 truncate">{title}</span>
           )}
           {typeof totalCount === 'number' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium tabular-nums">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium tabular-nums shrink-0">
               {totalCount.toLocaleString('vi-VN')} {countLabel}
             </span>
           )}
           {loading && (
-            <span className="inline-flex items-center gap-1 text-blue-700 text-xs">
+            <span className="inline-flex items-center gap-1 text-blue-700 text-xs shrink-0">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               <span>Đang tải...</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
           {toolbarExtra}
 
-          {/* Column Visibility Toggle */}
+          {/* Column Visibility Toggle (desktop table only) */}
           {hideableCols.length > 0 && onToggleCol && (
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <div className="hidden md:block relative" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 onClick={() => setColsOpen((o) => !o)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 rounded-md border text-xs font-medium transition cursor-pointer ${
                   colsOpen || hiddenCols.length > 0
                     ? 'border-blue-200 bg-blue-50/70 text-blue-700'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
                 title="Ẩn / hiện các cột mở rộng"
+                aria-label="Ẩn / hiện các cột mở rộng"
               >
                 <Columns className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cột</span>
                 {hiddenCols.length > 0 && (
                   <span className="text-[10px] px-1 rounded bg-blue-700 text-white tabular-nums">
                     {hideableCols.length - hiddenCols.length}/{hideableCols.length}
@@ -195,37 +195,37 @@ export default function DataTableShell({
             </div>
           )}
 
-          {/* Compact / Comfortable Density Switch */}
+          {/* Compact / Comfortable Density Switch (desktop table only) */}
           <div
             role="group"
             aria-label="Mật độ dòng bảng"
-            className="inline-flex p-0.5 rounded-xl bg-slate-100/90 border border-slate-200/80"
+            className="hidden md:inline-flex p-0.5 rounded-xl bg-slate-100/90 border border-slate-200/80"
           >
             <button
               type="button"
               onClick={() => onDensityChange('compact')}
               title="Hiển thị gọn (nhiều dòng hơn)"
-              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+              aria-label="Hiển thị gọn"
+              className={`inline-flex items-center gap-1 min-h-[30px] sm:min-h-0 px-2 py-1 rounded-md text-[11px] font-medium transition cursor-pointer ${
                 density === 'compact'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <AlignJustify className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Gọn</span>
             </button>
             <button
               type="button"
               onClick={() => onDensityChange('comfortable')}
               title="Hiển thị thoáng"
-              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+              aria-label="Hiển thị thoáng"
+              className={`inline-flex items-center gap-1 min-h-[30px] sm:min-h-0 px-2 py-1 rounded-md text-[11px] font-medium transition cursor-pointer ${
                 density === 'comfortable'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <List className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Thoáng</span>
             </button>
           </div>
         </div>

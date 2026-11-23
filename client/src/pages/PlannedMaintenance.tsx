@@ -382,130 +382,106 @@ export default function PlannedMaintenance() {
   }
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* 1. TOP HEADER */}
-      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-              Quy trình bảo dưỡng định kỳ
+    <div className="space-y-4 pb-12">
+      {/* 1. COMPACT HEADER */}
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              Bảo Trì Định Kỳ Theo Kế Hoạch
+            </h1>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+              Chu kỳ 1–12 tháng
             </span>
-            <h1 className="text-2xl font-bold text-slate-900">Bảo Trì Định Kỳ Theo Kế Hoạch</h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Lập kế hoạch & theo dõi chu kỳ bảo trì (1, 3, 6, 12 tháng) đảm bảo máy móc hoạt động bền bỉ, an toàn
+          <p className="text-xs text-slate-500 mt-0.5">
+            Lập kế hoạch &amp; theo dõi chu kỳ bảo dưỡng định kỳ giúp thiết bị vận hành ổn định, an toàn
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setActiveTab(activeTab === 'PRINT' ? 'ALL' : 'PRINT')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition cursor-pointer ${
+            title={activeTab === 'PRINT' ? 'Quay lại danh sách' : 'In kế hoạch bảo trì định kỳ A4'}
+            aria-label={activeTab === 'PRINT' ? 'Danh sách' : 'In kế hoạch A4'}
+            className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-md border transition cursor-pointer ${
               activeTab === 'PRINT' 
                 ? 'bg-purple-50 border-purple-300 text-purple-800' 
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs'
             }`}
           >
             <Printer className="w-4 h-4 text-purple-600" />
-            {activeTab === 'PRINT' ? 'Quay lại danh sách' : 'In Kế Hoạch A4'}
+            <span className="hidden md:inline">{activeTab === 'PRINT' ? 'Danh sách' : 'In A4'}</span>
           </button>
 
           <button
             onClick={fetchData}
-            className="p-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer"
+            className="p-2 text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition cursor-pointer"
             title="Làm mới dữ liệu"
+            aria-label="Làm mới dữ liệu"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow transition cursor-pointer"
+            title="Lập kế hoạch bảo trì định kỳ mới"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 shadow-xs transition cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Lập Kế Hoạch Bảo Trì
+            <Plus className="w-4 h-4" />
+            <span>Thêm lịch</span>
           </button>
         </div>
       </div>
 
-      {/* 2. STATS SUMMARY CARDS */}
-      <div className="print:hidden grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
-          <div className="text-xs text-slate-500 font-medium">Tổng lượt bảo trì</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{stats?.total || records.length}</div>
-          <div className="text-[11px] text-emerald-600 mt-1 font-semibold">Theo kế hoạch năm 2026</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
-          <div className="text-xs text-slate-500 font-medium">Đạt tiêu chuẩn</div>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">{stats?.passCount || records.filter(r => r.result === 'PASS').length}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Hoạt động ổn định</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
-          <div className="text-xs text-slate-500 font-medium">Sắp đến hạn (30 ngày)</div>
-          <div className="text-2xl font-bold text-amber-600 mt-1">
-            {stats?.upcomingCount || records.filter(r => r.nextMaintenanceDate && new Date(r.nextMaintenanceDate) >= now && new Date(r.nextMaintenanceDate) <= future30).length}
-          </div>
-          <div className="text-[11px] text-amber-600 mt-1 font-medium">Cần chuẩn bị bảo trì</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
-          <div className="text-xs text-slate-500 font-medium">Quá hạn bảo trì</div>
-          <div className="text-2xl font-bold text-red-600 mt-1">
-            {stats?.overdueCount || records.filter(r => r.nextMaintenanceDate && new Date(r.nextMaintenanceDate) < now).length}
-          </div>
-          <div className="text-[11px] text-red-500 mt-1 font-medium">Cần thực hiện ngay</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs col-span-2 sm:col-span-1">
-          <div className="text-xs text-slate-500 font-medium">Tổng kinh phí bảo trì</div>
-          <div className="text-lg font-bold text-slate-900 mt-1 font-mono text-emerald-700">
-            {stats?.totalCost ? Number(stats.totalCost).toLocaleString('vi-VN') : '0'} đ
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">Sự nghiệp & Quỹ PTHĐSN</div>
-        </div>
-      </div>
-
-      {/* 3. TABS & FILTERS */}
+      {/* 2. UNIFIED METRIC STRIP & FILTERS */}
       {activeTab !== 'PRINT' && (
-        <div className="print:hidden bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          {/* Navigation Sub-Tabs */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
+        <div className="print:hidden bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+          {/* Navigation Sub-Tabs + Compact Metrics */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 onClick={() => setActiveTab('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'ALL' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer inline-flex items-center gap-1.5 ${
+                  activeTab === 'ALL' ? 'bg-slate-900 text-white font-semibold shadow-2xs' : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70'
                 }`}
               >
                 <CalendarCheck className="w-3.5 h-3.5" />
-                Tất cả hồ sơ ({records.length})
+                <span>Tất cả ({stats?.total || records.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('UPCOMING')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'UPCOMING' ? 'bg-amber-500 text-white shadow-sm' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer inline-flex items-center gap-1.5 ${
+                  activeTab === 'UPCOMING' ? 'bg-amber-600 text-white font-semibold shadow-2xs' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
                 }`}
               >
                 <Clock className="w-3.5 h-3.5" />
-                Sắp đến hạn (30 ngày)
+                <span>Sắp đến hạn ({stats?.upcomingCount || records.filter(r => r.nextMaintenanceDate && new Date(r.nextMaintenanceDate) >= now && new Date(r.nextMaintenanceDate) <= future30).length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('OVERDUE')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'OVERDUE' ? 'bg-red-600 text-white shadow-sm' : 'bg-red-50 text-red-800 hover:bg-red-100'
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer inline-flex items-center gap-1.5 ${
+                  activeTab === 'OVERDUE' ? 'bg-rose-600 text-white font-semibold shadow-2xs' : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
                 }`}
               >
                 <AlertTriangle className="w-3.5 h-3.5" />
-                Quá hạn bảo trì
+                <span>Quá hạn ({stats?.overdueCount || records.filter(r => r.nextMaintenanceDate && new Date(r.nextMaintenanceDate) < now).length})</span>
               </button>
+
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs font-medium tabular-nums">
+                Đạt chuẩn: <strong>{stats?.passCount || records.filter(r => r.result === 'PASS').length}</strong>
+              </span>
+            </div>
+
+            <div className="text-xs font-medium text-slate-600 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200/70 tabular-nums">
+              Tổng kinh phí: <strong className="text-slate-900">{stats?.totalCost ? Number(stats.totalCost).toLocaleString('vi-VN') : '0'} đ</strong>
             </div>
           </div>
 
           {/* Filters Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -571,7 +547,112 @@ export default function PlannedMaintenance() {
           isEmpty={filteredRecords.length === 0}
           emptyMessage="Không tìm thấy bản ghi bảo trì nào phù hợp."
         >
-          <div className="overflow-x-auto">
+          {/* Mobile Card View (< md) */}
+          <div className="md:hidden divide-y divide-slate-100">
+            {!loading &&
+              filteredRecords.map((r) => {
+                const isOverdue = r.nextMaintenanceDate && new Date(r.nextMaintenanceDate) < now;
+                const isUpcoming =
+                  r.nextMaintenanceDate &&
+                  new Date(r.nextMaintenanceDate) >= now &&
+                  new Date(r.nextMaintenanceDate) <= future30;
+
+                return (
+                  <div key={r.id} className="p-3.5 space-y-2 bg-white">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/70 font-mono text-[11px] font-medium text-emerald-700">
+                          {r.asset?.assetCode || '-'}
+                        </span>
+                        {isOverdue && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-semibold">
+                            Quá hạn
+                          </span>
+                        )}
+                        {isUpcoming && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold">
+                            Sắp đến hạn
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          r.result === 'PASS'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                            : r.result === 'NEEDS_REPAIR'
+                              ? 'bg-orange-50 text-orange-700 border border-orange-200/70'
+                              : r.result === 'PENDING'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                        }`}
+                      >
+                        {r.result === 'PASS'
+                          ? 'Đạt yêu cầu'
+                          : r.result === 'NEEDS_REPAIR'
+                            ? 'Cần sửa chữa'
+                            : r.result === 'PENDING'
+                              ? 'Đang thực hiện'
+                              : 'Không đạt'}
+                      </span>
+                    </div>
+
+                    <div className="font-heading text-sm font-semibold text-slate-900 leading-snug">
+                      {r.asset?.name}
+                    </div>
+                    <p className="text-xs text-slate-600 line-clamp-2">
+                      {r.planContent || 'Bảo dưỡng định kỳ'}
+                    </p>
+
+                    <div className="text-xs text-slate-500 space-y-0.5 tabular-nums">
+                      <div>
+                        {r.asset?.department?.name || 'CDC'} · {r.vendor || 'Đơn vị kỹ thuật'}
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span>
+                          Hạn tới:{' '}
+                          <strong className={isOverdue ? 'text-rose-600' : isUpcoming ? 'text-amber-700' : 'text-slate-800'}>
+                            {r.nextMaintenanceDate ? new Date(r.nextMaintenanceDate).toLocaleDateString('vi-VN') : '—'}
+                          </strong>{' '}
+                          ({r.cycleMonths ? `${r.cycleMonths}t` : '6t'})
+                        </span>
+                        <span className="font-semibold text-slate-800">
+                          {r.cost ? Number(r.cost).toLocaleString('vi-VN') : '0'} đ
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDetail(r)}
+                        className="flex-1 min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-emerald-50 text-emerald-700 text-xs font-semibold cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Xem / In</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(r)}
+                        className="min-h-[38px] px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium cursor-pointer"
+                        title="Chỉnh sửa hồ sơ"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(r.id)}
+                        className="min-h-[38px] px-3 py-1.5 rounded-md border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-medium cursor-pointer"
+                        title="Xóa hồ sơ"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
                 <tr>
@@ -821,7 +902,7 @@ export default function PlannedMaintenance() {
           <div className="print:hidden mt-8 text-center border-t border-slate-200 pt-4">
             <button
               onClick={() => window.print()}
-              className="px-6 py-2.5 bg-purple-600 text-white rounded-xl font-bold shadow hover:bg-purple-700 transition cursor-pointer"
+              className="px-6 py-2.5 bg-purple-600 text-white rounded-md font-bold shadow hover:bg-purple-700 transition cursor-pointer"
             >
               In văn bản Kế Hoạch Bảo Trì
             </button>
@@ -848,7 +929,7 @@ export default function PlannedMaintenance() {
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1.5 hover:bg-white/20 rounded-xl transition text-white"
+                className="p-1.5 hover:bg-white/20 rounded-md transition text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -905,13 +986,13 @@ export default function PlannedMaintenance() {
                           setSelectedUnitForCreate('DUOC');
                           setSelectedAssetIds([]);
                         }}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                        className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
                           selectedUnitForCreate === 'DUOC'
                             ? 'bg-emerald-600 text-white shadow-xs'
                             : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        🩺 Khối TBYT (Dược)
+                        Khối TBYT (Dược)
                       </button>
                       <button
                         type="button"
@@ -919,13 +1000,13 @@ export default function PlannedMaintenance() {
                           setSelectedUnitForCreate('ALL');
                           setSelectedAssetIds([]);
                         }}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                        className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
                           selectedUnitForCreate === 'ALL'
                             ? 'bg-blue-600 text-white shadow-xs'
                             : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        📦 Tất cả tài sản
+                        Tất cả tài sản
                       </button>
                     </div>
                   </div>
@@ -951,7 +1032,7 @@ export default function PlannedMaintenance() {
                     <button
                       type="button"
                       onClick={handleSelectAll}
-                      className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer"
+                      className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition cursor-pointer"
                     >
                       Chọn tất cả ({filteredAssetsForSelector.length})
                     </button>
@@ -959,7 +1040,7 @@ export default function PlannedMaintenance() {
                       <button
                         type="button"
                         onClick={handleDeselectAll}
-                        className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+                        className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition cursor-pointer"
                       >
                         Bỏ chọn
                       </button>
@@ -1085,10 +1166,10 @@ export default function PlannedMaintenance() {
                     onChange={e => setFormData({ ...formData, result: e.target.value })}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 outline-none font-bold"
                   >
-                    <option value="PASS">✅ Đạt tiêu chuẩn / Tốt</option>
-                    <option value="NEEDS_REPAIR">⚠️ Cần sửa chữa thêm</option>
-                    <option value="PENDING">⏳ Đang thực hiện</option>
-                    <option value="FAIL">❌ Không đạt</option>
+                    <option value="PASS">Đạt tiêu chuẩn / Tốt</option>
+                    <option value="NEEDS_REPAIR">Cần sửa chữa thêm</option>
+                    <option value="PENDING">Đang thực hiện</option>
+                    <option value="FAIL">Không đạt</option>
                   </select>
                 </div>
 
@@ -1145,13 +1226,13 @@ export default function PlannedMaintenance() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow transition cursor-pointer"
                 >
                   Lưu Kế Hoạch Bảo Trì
                 </button>
@@ -1179,7 +1260,7 @@ export default function PlannedMaintenance() {
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-1.5 hover:bg-white/20 rounded-xl transition text-white"
+                className="p-1.5 hover:bg-white/20 rounded-md transition text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1196,7 +1277,7 @@ export default function PlannedMaintenance() {
                     <span className="font-bold text-xs text-slate-900">{editingRecord?.asset?.name}</span>
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    🏢 {editingRecord?.asset?.department?.name} • 📍 {editingRecord?.asset?.locationDetail || 'Cơ sở 1'}
+                    {editingRecord?.asset?.department?.name} · {editingRecord?.asset?.locationDetail || 'Cơ sở 1'}
                   </div>
                 </div>
               </div>
@@ -1288,10 +1369,10 @@ export default function PlannedMaintenance() {
                     onChange={e => setEditData({ ...editData, result: e.target.value })}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                   >
-                    <option value="PASS">✅ Đạt tiêu chuẩn / Tốt</option>
-                    <option value="NEEDS_REPAIR">⚠️ Cần sửa chữa thêm</option>
-                    <option value="PENDING">⏳ Đang thực hiện</option>
-                    <option value="FAIL">❌ Không đạt</option>
+                    <option value="PASS">Đạt tiêu chuẩn / Tốt</option>
+                    <option value="NEEDS_REPAIR">Cần sửa chữa thêm</option>
+                    <option value="PENDING">Đang thực hiện</option>
+                    <option value="FAIL">Không đạt</option>
                   </select>
                 </div>
 
@@ -1344,13 +1425,13 @@ export default function PlannedMaintenance() {
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow transition cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow transition cursor-pointer"
                 >
                   Cập Nhật Kế Hoạch
                 </button>
@@ -1392,14 +1473,14 @@ export default function PlannedMaintenance() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-emerald-800 rounded-xl text-xs font-bold shadow hover:bg-emerald-50 transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-emerald-800 rounded-md text-xs font-bold shadow hover:bg-emerald-50 transition cursor-pointer"
                   title="In biên bản bảo dưỡng ra máy in hoặc lưu PDF"
                 >
                   <Printer className="w-4 h-4 text-emerald-700" /> In Biên Bản Này (A4)
                 </button>
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="p-1.5 hover:bg-white/20 rounded-xl transition text-white"
+                  className="p-1.5 hover:bg-white/20 rounded-md transition text-white"
                 >
                   <X className="w-5 h-5" />
                 </button>

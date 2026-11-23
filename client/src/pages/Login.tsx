@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Lock, User, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { apiPost } from '../lib/api';
 
 export default function Login() {
@@ -11,6 +11,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const rawRedirect = searchParams.get('redirect') || '';
+  const safeRedirect = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/dashboard';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +28,7 @@ export default function Login() {
       const res = await apiPost('/auth/login', { username: cleanUser, password: cleanPass });
       if (res.token && res.user) {
         login(res.token, res.user);
-        navigate('/');
+        navigate(safeRedirect, { replace: true });
         return;
       }
       throw new Error(res.error || 'Tên đăng nhập hoặc mật khẩu không chính xác');
@@ -37,7 +41,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+    <div className="min-h-screen bg-[#F4F7FA] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* CDC Logo / Icon */}
         <div className="flex justify-center">
@@ -105,7 +109,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 shadow-lg shadow-blue-600/20 transition cursor-pointer disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-md text-sm font-bold text-white bg-cyan-700 hover:bg-cyan-800 focus:ring-4 focus:ring-cyan-100 shadow-lg shadow-cyan-900/15 transition cursor-pointer disabled:opacity-60"
               >
                 {loading ? 'Đang xác thực...' : 'Đăng nhập'}
                 <ArrowRight className="w-4 h-4" />
@@ -113,9 +117,18 @@ export default function Login() {
             </div>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-1.5 text-slate-400 text-xs">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Hệ thống bảo mật nội bộ CDC Đà Nẵng</span>
+          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1 text-slate-600 hover:text-cyan-700 font-medium transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Truy cập nhanh</span>
+            </Link>
+            <div className="inline-flex items-center gap-1.5 text-slate-400">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span>Nội bộ CDC Đà Nẵng</span>
+            </div>
           </div>
         </div>
       </div>

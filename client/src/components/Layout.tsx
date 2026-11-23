@@ -36,6 +36,7 @@ import {
   Download,
   Smartphone,
   Settings,
+  Sparkles,
 } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -47,6 +48,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: React.ElementType;
+  matchPaths?: string[];
 }
 
 interface NavGroup {
@@ -55,23 +57,23 @@ interface NavGroup {
 }
 
 const ROUTE_TITLES: { match: (path: string) => boolean; group: string; label: string }[] = [
-  { match: (p) => p === '/', group: 'Tổng quan', label: 'Bảng điều khiển' },
+  { match: (p) => p === '/dashboard', group: 'Tổng quan', label: 'Bảng điều khiển' },
   { match: (p) => p === '/assets', group: 'Tài sản', label: 'Danh mục tài sản' },
   { match: (p) => p === '/assets/new', group: 'Tài sản', label: 'Thêm mới thiết bị' },
   { match: (p) => /^\/assets\/[^/]+\/edit$/.test(p), group: 'Tài sản', label: 'Cập nhật thiết bị' },
   { match: (p) => /^\/assets\/[^/]+$/.test(p), group: 'Tài sản', label: 'Hồ sơ chi tiết thiết bị' },
   { match: (p) => /^\/qr\/[^/]+$/.test(p), group: 'Tài sản', label: 'Tra cứu thiết bị qua QR' },
-  { match: (p) => p === '/transfers', group: 'Vận hành & Bảo trì', label: 'Điều chuyển tài sản' },
-  { match: (p) => p === '/maintenance', group: 'Vận hành & Bảo trì', label: 'Báo hỏng / Sửa chữa' },
-  { match: (p) => p === '/planned-maintenance', group: 'Vận hành & Bảo trì', label: 'Bảo trì kế hoạch' },
-  { match: (p) => p === '/calibration', group: 'Vận hành & Bảo trì', label: 'Hiệu chuẩn / Kiểm định' },
+  { match: (p) => p === '/transfers', group: 'Vận hành & Kỹ thuật', label: 'Điều chuyển tài sản' },
+  { match: (p) => p === '/maintenance', group: 'Bảo trì & Kỹ thuật', label: 'Báo hỏng / Sửa chữa' },
+  { match: (p) => p === '/planned-maintenance', group: 'Bảo trì & Kỹ thuật', label: 'Bảo trì định kỳ' },
+  { match: (p) => p === '/calibration', group: 'Bảo trì & Kỹ thuật', label: 'Hiệu chuẩn / Kiểm định' },
   { match: (p) => p === '/inventory', group: 'Kiểm soát & Tài chính', label: 'Kiểm kê tài sản' },
-  { match: (p) => p === '/depreciation', group: 'Kiểm soát & Tài chính', label: 'Khấu hao & Hao mòn' },
-  { match: (p) => p === '/disposals', group: 'Kiểm soát & Tài chính', label: 'Thanh lý tài sản' },
-  { match: (p) => p === '/qr-scanner', group: 'Kiểm soát & Tài chính', label: 'Quét mã QR' },
-  { match: (p) => p === '/departments', group: 'Hệ thống', label: 'Khoa phòng / Đơn vị' },
-  { match: (p) => p === '/users', group: 'Hệ thống', label: 'Quản lý tài khoản' },
-  { match: (p) => p === '/settings', group: 'Hệ thống', label: 'Cài đặt & Telegram' },
+  { match: (p) => p === '/depreciation', group: 'Khấu hao & Thanh lý', label: 'Khấu hao & Hao mòn' },
+  { match: (p) => p === '/disposals', group: 'Khấu hao & Thanh lý', label: 'Thanh lý tài sản' },
+  { match: (p) => p === '/qr-scanner', group: 'Tiện ích', label: 'Quét mã QR' },
+  { match: (p) => p === '/departments', group: 'Quản trị Hệ thống', label: 'Khoa phòng / Đơn vị' },
+  { match: (p) => p === '/users', group: 'Quản trị Hệ thống', label: 'Quản lý tài khoản' },
+  { match: (p) => p === '/settings', group: 'Quản trị Hệ thống', label: 'Cài đặt & Telegram' },
 ];
 
 export default function Layout() {
@@ -88,6 +90,37 @@ export default function Layout() {
       return false;
     }
   });
+
+  const [liteMode, setLiteMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('qlts_ui_lite_mode');
+      if (saved === '1') return true;
+      if (saved === '0') return false;
+      return user?.role === 'DEPARTMENT';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('qlts_ui_lite_mode');
+      if (saved === null) {
+        setLiteMode(user?.role === 'DEPARTMENT');
+      }
+    } catch {}
+  }, [user?.role]);
+
+  const toggleLiteMode = () => {
+    setLiteMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('qlts_ui_lite_mode', next ? '1' : '0');
+      } catch {}
+      window.dispatchEvent(new Event('qlts:litemode'));
+      return next;
+    });
+  };
 
   // Change Password Modal
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -332,40 +365,56 @@ export default function Layout() {
   }, [user]);
 
   const navGroups: NavGroup[] = useMemo(() => {
-    const canCalibrate =
-      user?.role === 'ADMIN' ||
-      user?.role === 'VIEWER' ||
-      user?.role === 'MANAGER_DUOC' ||
-      user?.role === 'DEPARTMENT';
-
-    const operationsItems: NavItem[] = [
-      { to: '/transfers', label: 'Điều chuyển tài sản', icon: ArrowLeftRight },
-      { to: '/maintenance', label: 'Báo hỏng / Sửa chữa', icon: Wrench },
-    ];
-    if (canCalibrate) {
-      operationsItems.push({ to: '/planned-maintenance', label: 'Bảo trì kế hoạch', icon: CalendarClock });
-      operationsItems.push({ to: '/calibration', label: 'Hiệu chuẩn / Kiểm định', icon: Award });
+    if (liteMode && user?.role === 'DEPARTMENT') {
+      return [
+        {
+          title: 'Cổng Khoa / Phòng',
+          items: [
+            { to: '/dashboard', label: 'Cổng chính & Báo hỏng', icon: LayoutDashboard },
+            { to: '/assets', label: 'Thiết bị của Khoa', icon: Package },
+            {
+              to: '/maintenance',
+              label: 'Sửa chữa & Bảo trì',
+              icon: Wrench,
+              matchPaths: ['/maintenance', '/planned-maintenance', '/calibration'],
+            },
+            { to: '/inventory', label: 'Kiểm kê C53-HD', icon: ClipboardCheck },
+            { to: '/transfers', label: 'Điều chuyển', icon: ArrowLeftRight },
+          ],
+        },
+      ];
     }
 
     const groups: NavGroup[] = [
       {
         title: 'Tổng quan',
         items: [
-          { to: '/', label: 'Bảng điều khiển', icon: LayoutDashboard },
+          { to: '/dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
           { to: '/assets', label: 'Danh mục tài sản', icon: Package },
         ],
       },
       {
-        title: 'Vận hành & Bảo trì',
-        items: operationsItems,
+        title: 'Vận hành & Kỹ thuật',
+        items: [
+          {
+            to: '/maintenance',
+            label: 'Bảo trì & Kỹ thuật',
+            icon: Wrench,
+            matchPaths: ['/maintenance', '/planned-maintenance', '/calibration'],
+          },
+          { to: '/transfers', label: 'Điều chuyển tài sản', icon: ArrowLeftRight },
+        ],
       },
       {
         title: 'Kiểm soát & Tài chính',
         items: [
           { to: '/inventory', label: 'Kiểm kê tài sản', icon: ClipboardCheck },
-          { to: '/depreciation', label: 'Khấu hao & Hao mòn', icon: TrendingDown },
-          { to: '/disposals', label: 'Thanh lý tài sản', icon: Trash2 },
-          { to: '/qr-scanner', label: 'Quét mã QR', icon: QrCode },
+          {
+            to: '/depreciation',
+            label: 'Khấu hao & Thanh lý',
+            icon: TrendingDown,
+            matchPaths: ['/depreciation', '/disposals'],
+          },
         ],
       },
     ];
@@ -374,15 +423,55 @@ export default function Layout() {
       groups.push({
         title: 'Hệ thống',
         items: [
-          { to: '/departments', label: 'Khoa phòng / Đơn vị', icon: Building2 },
-          { to: '/users', label: 'Quản lý tài khoản', icon: Users },
-          { to: '/settings', label: 'Cài đặt & Telegram', icon: Settings },
+          {
+            to: '/users',
+            label: 'Quản trị Hệ thống',
+            icon: Settings,
+            matchPaths: ['/users', '/departments', '/settings'],
+          },
         ],
       });
     }
 
     return groups;
-  }, [user?.role]);
+  }, [user?.role, liteMode]);
+
+  const moduleTabs = useMemo(() => {
+    const p = location.pathname;
+    const canCalibrate =
+      user?.role === 'ADMIN' ||
+      user?.role === 'VIEWER' ||
+      user?.role === 'MANAGER_DUOC' ||
+      user?.role === 'DEPARTMENT';
+
+    if (p.startsWith('/maintenance') || p.startsWith('/planned-maintenance') || p.startsWith('/calibration')) {
+      const tabs: NavItem[] = [
+        { to: '/maintenance', label: 'Báo hỏng & Sửa chữa', icon: Wrench },
+      ];
+      if (canCalibrate) {
+        tabs.push({ to: '/planned-maintenance', label: 'Bảo trì định kỳ', icon: CalendarClock });
+        tabs.push({ to: '/calibration', label: 'Hiệu chuẩn / Kiểm định', icon: Award });
+      }
+      return tabs;
+    }
+
+    if (p.startsWith('/depreciation') || p.startsWith('/disposals')) {
+      return [
+        { to: '/depreciation', label: 'Khấu hao & Hao mòn', icon: TrendingDown },
+        { to: '/disposals', label: 'Thanh lý tài sản', icon: Trash2 },
+      ];
+    }
+
+    if (user?.role === 'ADMIN' && (p.startsWith('/users') || p.startsWith('/departments') || p.startsWith('/settings'))) {
+      return [
+        { to: '/users', label: 'Tài khoản & Phân quyền', icon: Users },
+        { to: '/departments', label: 'Khoa / Phòng', icon: Building2 },
+        { to: '/settings', label: 'Cài đặt & Telegram', icon: Settings },
+      ];
+    }
+
+    return null;
+  }, [location.pathname, user?.role]);
 
   const activeRouteMeta = useMemo(() => {
     return (
@@ -395,29 +484,29 @@ export default function Layout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const RoleIcon = roleMeta.Icon;
 
   return (
-    <div className="min-h-screen flex bg-[#F8FAFC] text-slate-900">
+    <div className="min-h-screen flex bg-[#F4F7FA] text-slate-900">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
-          className="print-hidden fixed inset-0 bg-slate-900/40 backdrop-blur-[1px] z-40 lg:hidden"
+          className="print-hidden fixed inset-0 bg-slate-900/35 backdrop-blur-[1px] z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Light Minimal Sidebar (PA 2) */}
       <aside
-        className={`print-hidden fixed inset-y-0 left-0 z-50 bg-[#0F172A] text-slate-200 flex flex-col border-r border-slate-800/80 transition-all duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`print-hidden fixed inset-y-0 left-0 z-50 bg-white text-slate-700 flex flex-col border-r border-slate-200/90 transition-all duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0 shadow-xl lg:shadow-none' : '-translate-x-full'
         } ${collapsed ? 'lg:w-[70px] w-64' : 'w-64'}`}
       >
         {/* Brand Logo Header */}
-        <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-800/80 shrink-0">
+        <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-100 shrink-0">
           <Link
             to="/"
             onClick={() => setSidebarOpen(false)}
@@ -426,13 +515,13 @@ export default function Layout() {
             <img
               src="/cdc-logo.png"
               alt="Logo CDC Đà Nẵng"
-              className="w-9 h-9 rounded-xl object-contain shadow-sm shrink-0"
+              className="w-9 h-9 rounded-xl object-contain border border-slate-200/70 bg-slate-50/50 shrink-0"
             />
             <div className={collapsed ? 'lg:hidden' : ''}>
-              <h1 className="font-heading text-[15px] font-semibold leading-tight text-white tracking-tight truncate">
+              <h1 className="font-heading text-[15px] font-bold leading-tight text-slate-900 tracking-tight truncate">
                 QLTS CDC
               </h1>
-              <p className="text-[11px] text-slate-400 truncate">Đà Nẵng · Y tế & Thiết bị</p>
+              <p className="text-[11px] text-slate-500 truncate">Đà Nẵng · Y tế &amp; Thiết bị</p>
             </div>
           </Link>
 
@@ -440,7 +529,7 @@ export default function Layout() {
             type="button"
             onClick={() => setSidebarOpen(false)}
             aria-label="Đóng menu"
-            className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            className="lg:hidden p-2 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100"
           >
             <X className="w-5 h-5" />
           </button>
@@ -451,18 +540,21 @@ export default function Layout() {
           {navGroups.map((group) => (
             <div key={group.title}>
               {!collapsed && (
-                <div className="px-3 mb-1.5 text-[11px] font-heading font-semibold uppercase tracking-wider text-slate-400/90">
+                <div className="px-3 mb-1.5 text-[11px] font-heading font-semibold uppercase tracking-wider text-slate-400">
                   {group.title}
                 </div>
               )}
-              {collapsed && <div className="hidden lg:block h-px bg-slate-800/80 mx-2 mb-2" />}
+              {collapsed && <div className="hidden lg:block h-px bg-slate-200/80 mx-2 mb-2" />}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const isActive =
-                    item.to === '/'
-                      ? location.pathname === '/'
-                      : location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+                  const isActive = item.matchPaths
+                    ? item.matchPaths.some(
+                        (mp) => location.pathname === mp || location.pathname.startsWith(mp + '/')
+                      )
+                    : item.to === '/'
+                    ? location.pathname === '/'
+                    : location.pathname === item.to || location.pathname.startsWith(item.to + '/');
 
                   return (
                     <Link
@@ -470,17 +562,17 @@ export default function Layout() {
                       to={item.to}
                       title={collapsed ? item.label : undefined}
                       onClick={() => setSidebarOpen(false)}
-                      className={`group flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors ${
+                      className={`group flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors border ${
                         collapsed ? 'lg:justify-center lg:px-0' : ''
                       } ${
                         isActive
-                          ? 'bg-blue-600/90 text-white shadow-xs'
-                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                          ? 'bg-cyan-50/90 text-cyan-800 border-cyan-200/80 font-semibold shadow-2xs'
+                          : 'border-transparent text-slate-600 font-medium hover:bg-slate-100/80 hover:text-slate-900'
                       }`}
                     >
                       <Icon
-                        className={`w-[18px] h-[18px] shrink-0 ${
-                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+                        className={`w-[18px] h-[18px] shrink-0 transition-colors ${
+                          isActive ? 'text-cyan-700' : 'text-slate-400 group-hover:text-cyan-700'
                         }`}
                       />
                       <span className={`truncate ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
@@ -493,13 +585,13 @@ export default function Layout() {
         </nav>
 
         {/* Bottom User Profile & Collapse Control */}
-        <div className="p-2.5 border-t border-slate-800/80 shrink-0 space-y-1.5">
+        <div className="p-2.5 border-t border-slate-100 shrink-0 space-y-1.5">
           {/* Desktop Collapse Button */}
           <button
             type="button"
             onClick={toggleCollapsed}
             title={collapsed ? 'Mở rộng menu bên' : 'Thu gọn menu bên'}
-            className={`hidden lg:flex w-full items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/80 transition cursor-pointer ${
+            className={`hidden lg:flex w-full items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer ${
               collapsed ? 'justify-center px-0' : ''
             }`}
           >
@@ -508,25 +600,42 @@ export default function Layout() {
             ) : (
               <>
                 <PanelLeftClose className="w-4 h-4 shrink-0" />
-                <span>Thu gọn thanh bên</span>
+                <span>Thu gọn</span>
               </>
             )}
           </button>
 
+          {/* Mobile Drawer PWA Install Shortcut */}
+          {!isStandalone && (
+            <button
+              type="button"
+              onClick={handleInstallWebApp}
+              title="Cài đặt WebApp lên màn hình chính"
+              className={`lg:hidden flex w-full items-center gap-2.5 px-3 py-2.5 rounded-md text-xs font-medium transition cursor-pointer ${
+                installPromptEvent
+                  ? 'bg-cyan-700 text-white hover:bg-cyan-800'
+                  : 'text-slate-600 bg-slate-50 border border-slate-200/80 hover:bg-slate-100'
+              }`}
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Cài WebApp lên màn hình</span>
+            </button>
+          )}
+
           {/* Compact User Card */}
           <div
-            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-slate-800/50 border border-slate-800 ${
+            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-slate-50/90 border border-slate-200/80 ${
               collapsed ? 'lg:justify-center lg:px-1.5' : ''
             }`}
           >
-            <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-300 border border-blue-500/30 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-200/80 flex items-center justify-center shrink-0">
               <RoleIcon className="w-4 h-4" />
             </div>
             <div className={`flex-1 min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
-              <p className="text-[13px] font-medium text-white truncate">
+              <p className="text-[13px] font-semibold text-slate-900 truncate">
                 {user?.fullName || 'Người dùng'}
               </p>
-              <p className="text-[11px] text-slate-400 truncate">{roleMeta.label}</p>
+              <p className="text-[11px] text-slate-500 truncate">{roleMeta.label}</p>
             </div>
           </div>
 
@@ -535,7 +644,7 @@ export default function Layout() {
               type="button"
               onClick={() => setShowPasswordModal(true)}
               title="Đổi mật khẩu"
-              className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition cursor-pointer"
             >
               <KeyRound className="w-3.5 h-3.5 shrink-0" />
               <span className={collapsed ? 'lg:hidden' : ''}>Đổi MK</span>
@@ -544,7 +653,7 @@ export default function Layout() {
               type="button"
               onClick={handleLogout}
               title="Đăng xuất"
-              className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-medium text-rose-300 hover:text-rose-200 hover:bg-rose-500/15 rounded-xl transition cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-md transition cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5 shrink-0" />
               <span className={collapsed ? 'lg:hidden' : ''}>Thoát</span>
@@ -562,7 +671,7 @@ export default function Layout() {
               type="button"
               onClick={() => setSidebarOpen(true)}
               aria-label="Mở menu điều hướng"
-              className="lg:hidden -ml-1.5 w-11 h-11 flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer shrink-0"
+              className="lg:hidden -ml-1.5 w-11 h-11 flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 cursor-pointer shrink-0"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -589,40 +698,61 @@ export default function Layout() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Global Search Trigger */}
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-slate-100/90 text-slate-500 text-xs transition cursor-pointer"
+              title="Tìm nhanh tài sản (Ctrl + K)"
+              aria-label="Tìm nhanh tài sản"
+              className="flex items-center gap-1.5 min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-50/80 hover:bg-slate-100/90 text-slate-600 text-xs transition cursor-pointer"
             >
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <span className="hidden sm:inline">Tìm nhanh tài sản...</span>
-              <span className="sm:hidden">Tìm kiếm</span>
+              <Search className="w-4 h-4 text-slate-500" />
+              <span className="hidden sm:inline">Tìm</span>
               <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-slate-500 bg-white border border-slate-200 rounded-md">
                 Ctrl K
               </kbd>
             </button>
 
-            {/* Quick Breakdown Report Button */}
+            {/* Quick Breakdown Report Button (desktop/tablet; on mobile it lives in bottom nav) */}
             {user?.role !== 'VIEWER' && (
               <button
                 type="button"
                 onClick={() => navigate('/maintenance?quickReport=1')}
                 title="Mở nhanh phiếu báo hỏng thiết bị (kèm UltraViewer / ảnh sự cố)"
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-xs transition cursor-pointer shrink-0"
+                aria-label="Báo hỏng nhanh"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-xs transition cursor-pointer shrink-0"
               >
                 <Wrench className="w-3.5 h-3.5 shrink-0" />
-                <span className="sm:hidden">Báo hỏng</span>
-                <span className="hidden sm:inline">Báo hỏng nhanh</span>
+                <span>Báo hỏng</span>
               </button>
             )}
 
-            {/* Quick QR Scan */}
+            {/* Lite / Full Mode Switcher (icon-first) */}
+            <button
+              type="button"
+              onClick={toggleLiteMode}
+              title={
+                liteMode
+                  ? 'Đang ở chế độ Gọn nhẹ — Bấm để chuyển sang Đầy đủ'
+                  : 'Đang ở chế độ Đầy đủ — Bấm để bật Gọn nhẹ'
+              }
+              aria-label="Chuyển chế độ giao diện"
+              className={`inline-flex items-center justify-center min-h-[38px] sm:min-h-0 p-2 rounded-md border text-xs font-medium transition cursor-pointer shrink-0 ${
+                liteMode
+                  ? 'border-cyan-200 bg-cyan-50 text-cyan-800 hover:bg-cyan-100/80'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Sparkles className={`w-4 h-4 ${liteMode ? 'text-cyan-700' : 'text-slate-500'}`} />
+            </button>
+
+            {/* Quick QR Scan (desktop/tablet; on mobile it lives in bottom nav) */}
             <Link
               to="/qr-scanner"
               title="Quét mã QR tài sản"
-              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+              aria-label="Quét mã QR tài sản"
+              className="hidden sm:inline-flex p-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
             >
               <QrCode className="w-4 h-4" />
             </Link>
@@ -633,14 +763,17 @@ export default function Layout() {
                 type="button"
                 onClick={handleInstallWebApp}
                 title="Cài đặt WebApp lên màn hình chính / máy tính"
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                aria-label="Cài WebApp"
+                className={`${
+                  installPromptEvent ? 'inline-flex' : 'hidden sm:inline-flex'
+                } items-center gap-1.5 min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-md border text-xs font-medium transition cursor-pointer ${
                   installPromptEvent
-                    ? 'border-[#024383]/30 bg-[#024383] text-white hover:bg-[#02366b] shadow-xs'
+                    ? 'border-cyan-700/30 bg-cyan-700 text-white hover:bg-cyan-800 shadow-xs'
                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cài WebApp</span>
+                <Download className="w-4 h-4" />
+                <span className="hidden xl:inline">Cài app</span>
               </button>
             )}
 
@@ -655,7 +788,33 @@ export default function Layout() {
         </header>
 
         {/* Page Container */}
-        <main className="flex-1 p-4 sm:p-5 lg:p-6 max-w-[1600px] w-full mx-auto min-w-0">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 pb-24 lg:pb-6 max-w-[1600px] w-full mx-auto min-w-0">
+          {moduleTabs && moduleTabs.length > 1 && (
+            <nav
+              aria-label="Chuyển nhanh phân hệ cùng nhóm"
+              className="print-hidden mb-4 flex sm:inline-flex items-center gap-1 p-1 rounded-xl bg-white border border-slate-200/80 shadow-2xs overflow-x-auto max-w-full"
+            >
+              {moduleTabs.map((tab) => {
+                const TabIcon = tab.icon;
+                const active =
+                  location.pathname === tab.to || location.pathname.startsWith(tab.to + '/');
+                return (
+                  <Link
+                    key={tab.to}
+                    to={tab.to}
+                    className={`inline-flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap shrink-0 ${
+                      active
+                        ? 'bg-cyan-700 text-white shadow-2xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                    }`}
+                  >
+                    <TabIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{tab.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
           <Outlet />
         </main>
       </div>
@@ -698,7 +857,7 @@ export default function Layout() {
                 <button
                   type="button"
                   onClick={() => setSearchOpen(false)}
-                  className="text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+                  className="text-xs px-2 py-1 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
                 >
                   Esc
                 </button>
@@ -778,7 +937,7 @@ export default function Layout() {
                           setSearchOpen(false);
                           navigate(shortcut.to);
                         }}
-                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-left text-sm text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                       >
                         <span className="flex items-center gap-2.5">
                           <SIcon className="w-4 h-4 text-slate-400" />
@@ -856,7 +1015,7 @@ export default function Layout() {
                               navigate(`/maintenance?assetId=${asset.id}`);
                             }}
                             title="Báo hỏng thiết bị này ngay"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold transition cursor-pointer"
                           >
                             <Wrench className="w-3 h-3" />
                             <span className="hidden sm:inline">Báo hỏng</span>
@@ -915,7 +1074,7 @@ export default function Layout() {
                 type="button"
                 onClick={() => setShowPasswordModal(false)}
                 aria-label="Đóng"
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -974,14 +1133,14 @@ export default function Layout() {
                 <button
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition cursor-pointer"
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-md text-sm font-medium hover:bg-slate-50 transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={pwLoading}
-                  className="flex-1 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-sm font-medium transition disabled:opacity-50 cursor-pointer"
+                  className="flex-1 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-md text-sm font-medium transition disabled:opacity-50 cursor-pointer"
                 >
                   {pwLoading ? 'Đang lưu...' : 'Cập nhật mật khẩu'}
                 </button>
@@ -1014,7 +1173,7 @@ export default function Layout() {
               <button
                 type="button"
                 onClick={() => setShowInstallHelp(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-200/60 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1051,7 +1210,7 @@ export default function Layout() {
               <button
                 type="button"
                 onClick={() => setShowInstallHelp(false)}
-                className="px-4 py-1.5 rounded-xl bg-[#024383] hover:bg-[#02366b] text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-1.5 rounded-md bg-[#024383] hover:bg-[#02366b] text-white text-xs font-semibold cursor-pointer"
               >
                 Đã hiểu
               </button>
@@ -1059,6 +1218,54 @@ export default function Layout() {
           </div>
         </div>
       )}
+      {/* Mobile Bottom Navigation Bar */}
+      <nav
+        aria-label="Điều hướng nhanh trên di động"
+        className="lg:hidden print-hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] grid grid-cols-4 gap-1"
+      >
+        <Link
+          to="/dashboard"
+          className={`flex flex-col items-center justify-center min-h-[48px] py-1.5 rounded-md text-[11px] font-medium transition ${
+            location.pathname === '/dashboard' ? 'text-cyan-700 bg-cyan-50/80 font-semibold' : 'text-slate-600'
+          }`}
+        >
+          <LayoutDashboard className="w-4 h-4 mb-0.5" />
+          <span>Tổng quan</span>
+        </Link>
+        <Link
+          to="/assets"
+          className={`flex flex-col items-center justify-center min-h-[48px] py-1.5 rounded-md text-[11px] font-medium transition ${
+            location.pathname.startsWith('/assets')
+              ? 'text-cyan-700 bg-cyan-50/80 font-semibold'
+              : 'text-slate-600'
+          }`}
+        >
+          <Package className="w-4 h-4 mb-0.5" />
+          <span>Tài sản</span>
+        </Link>
+        <Link
+          to="/qr-scanner"
+          className={`flex flex-col items-center justify-center min-h-[48px] py-1.5 rounded-md text-[11px] font-medium transition ${
+            location.pathname.startsWith('/qr')
+              ? 'text-cyan-700 bg-cyan-50/80 font-semibold'
+              : 'text-slate-600'
+          }`}
+        >
+          <QrCode className="w-4 h-4 mb-0.5" />
+          <span>Quét QR</span>
+        </Link>
+        <Link
+          to={user?.role !== 'VIEWER' ? '/maintenance?quickReport=1' : '/maintenance'}
+          className={`flex flex-col items-center justify-center min-h-[48px] py-1.5 rounded-md text-[11px] font-semibold transition ${
+            location.pathname.startsWith('/maintenance')
+              ? 'text-amber-800 bg-amber-50'
+              : 'text-amber-700'
+          }`}
+        >
+          <Wrench className="w-4 h-4 mb-0.5" />
+          <span>{user?.role !== 'VIEWER' ? 'Báo hỏng' : 'Sửa chữa'}</span>
+        </Link>
+      </nav>
     </div>
   );
 }

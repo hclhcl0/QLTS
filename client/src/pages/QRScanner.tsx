@@ -115,7 +115,7 @@ export default function QRScanner() {
           />
           <button
             type="submit"
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition cursor-pointer"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-semibold transition cursor-pointer"
           >
             Tra cứu
           </button>
@@ -163,13 +163,13 @@ export default function QRScanner() {
           <div className="flex gap-2 pt-2 border-t border-slate-100">
             <button
               onClick={() => navigate(`/assets/${assetData.id}`)}
-              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold text-center shadow transition cursor-pointer"
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold text-center shadow transition cursor-pointer"
             >
               Xem toàn bộ lịch sử thiết bị
             </button>
             <button
               onClick={() => navigate(`/maintenance?assetId=${assetData.id}`)}
-              className="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+              className="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
             >
               <Wrench className="w-3.5 h-3.5" /> Báo hỏng máy này
             </button>

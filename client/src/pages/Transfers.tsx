@@ -178,7 +178,7 @@ export default function Transfers() {
         </div>
         <button 
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl text-sm font-semibold text-white hover:bg-blue-700 shadow transition cursor-pointer"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 rounded-md text-sm font-semibold text-white hover:bg-blue-700 shadow transition cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Tạo phiếu điều chuyển
         </button>
@@ -211,7 +211,7 @@ export default function Transfers() {
                   <button
                     type="button"
                     onClick={() => setUnitFilter('ALL')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       unitFilter === 'ALL'
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -222,7 +222,7 @@ export default function Transfers() {
                   <button
                     type="button"
                     onClick={() => setUnitFilter('CNTT')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       unitFilter === 'CNTT'
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
@@ -233,7 +233,7 @@ export default function Transfers() {
                   <button
                     type="button"
                     onClick={() => setUnitFilter('DUOC')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       unitFilter === 'DUOC'
                         ? 'bg-emerald-600 text-white shadow-xs'
                         : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
@@ -244,7 +244,7 @@ export default function Transfers() {
                   <button
                     type="button"
                     onClick={() => setUnitFilter('TCHC')}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       unitFilter === 'TCHC'
                         ? 'bg-amber-600 text-white shadow-xs'
                         : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
@@ -333,13 +333,13 @@ export default function Transfers() {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200"
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md text-sm font-semibold hover:bg-slate-200"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+                className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700"
               >
                 Gửi yêu cầu điều chuyển
               </button>
@@ -404,13 +404,13 @@ export default function Transfers() {
                     <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0">
                       <button 
                         onClick={() => handleApprove(t.id)}
-                        className="flex items-center gap-1 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow transition cursor-pointer"
+                        className="flex items-center gap-1 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow transition cursor-pointer"
                       >
                         <Check className="w-4 h-4" /> Phê duyệt
                       </button>
                       <button 
                         onClick={() => handleReject(t.id)}
-                        className="flex items-center gap-1 px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+                        className="flex items-center gap-1 px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-xs font-semibold transition cursor-pointer"
                       >
                         <X className="w-4 h-4" /> Từ chối
                       </button>

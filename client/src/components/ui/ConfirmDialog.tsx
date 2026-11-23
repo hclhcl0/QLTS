@@ -103,14 +103,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 ref={cancelBtnRef}
                 type="button"
                 onClick={() => handleClose(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                className="px-4 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
               >
                 {pending.options.cancelLabel || 'Hủy bỏ'}
               </button>
               <button
                 type="button"
                 onClick={() => handleClose(true)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium shadow-xs transition cursor-pointer ${confirmBtnClass}`}
+                className={`px-4 py-2 rounded-md text-sm font-medium shadow-xs transition cursor-pointer ${confirmBtnClass}`}
               >
                 {pending.options.confirmLabel || 'Xác nhận'}
               </button>

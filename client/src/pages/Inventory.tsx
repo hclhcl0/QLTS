@@ -107,6 +107,7 @@ export default function Inventory() {
   const [sortOrder2, setSortOrder2] = useState<'asc' | 'desc'>('asc');
   const [showSmartHints, setShowSmartHints] = useState<boolean>(false);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
 
   const handleSort = (field: string, isShiftKey = false) => {
     if (isShiftKey && field !== sortBy) {
@@ -634,7 +635,7 @@ export default function Inventory() {
               Mẫu C53-HD · 2026
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5 truncate">
+          <p className="hidden sm:block text-xs text-slate-500 mt-0.5 truncate">
             {formTitle} · Ngày lập {inventoryDate}
           </p>
         </div>
@@ -644,47 +645,51 @@ export default function Inventory() {
           <div
             role="group"
             aria-label="Chế độ hiển thị"
-            className="inline-flex p-0.5 rounded-xl bg-slate-100 border border-slate-200/80"
+            className="inline-flex p-0.5 rounded-xl bg-slate-100 border border-slate-200/80 shrink-0"
           >
             <button
               type="button"
               onClick={() => setViewMode('compact')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+              title="Bảng làm việc gọn"
+              className={`inline-flex items-center gap-1 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap ${
                 viewMode === 'compact'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Table2 className="w-3.5 h-3.5 text-blue-700" />
-              <span>Bảng gọn</span>
+              <span>Gọn</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('c53')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+              title="Mẫu biên bản kiểm kê C53-HD"
+              className={`inline-flex items-center gap-1 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap ${
                 viewMode === 'c53'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Eye className="w-3.5 h-3.5 text-slate-600" />
-              <span>Mẫu C53-HD</span>
+              <span>C53-HD</span>
             </button>
           </div>
 
           {/* C53-HD Config Popover */}
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={() => setSettingsOpen(o => !o)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+              title="Thiết lập Hội đồng, Người ký, Cột biên bản"
+              aria-label="Thiết lập"
+              className={`inline-flex items-center gap-1 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 rounded-md border text-xs font-medium transition cursor-pointer whitespace-nowrap ${
                 settingsOpen
                   ? 'border-blue-300 bg-blue-50/70 text-blue-800'
                   : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <Settings className="w-3.5 h-3.5 text-slate-500" />
-              <span>Thiết lập</span>
+              <Settings className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-slate-500" />
+              <span className="hidden md:inline">Thiết lập</span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
@@ -733,35 +738,56 @@ export default function Inventory() {
             )}
           </div>
 
-          {/* Compact Export Cluster */}
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white overflow-hidden divide-x divide-slate-200">
+          {/* Primary Save CTA */}
+          {user?.role !== 'VIEWER' && (
+            <button
+              type="button"
+              onClick={handleSaveInventory}
+              disabled={saving || loading}
+              title="Lưu số liệu kiểm kê"
+              className="sm:order-last inline-flex items-center gap-1.5 min-h-[34px] sm:min-h-0 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white rounded-md text-xs font-semibold shadow-xs transition cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{saving ? 'Đang lưu...' : 'Lưu'}</span>
+              {dirtyIds.size > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold leading-none tabular-nums">
+                  {dirtyIds.size}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Compact Export Cluster (icon-first) */}
+          <div className="inline-flex max-w-full overflow-x-auto no-scrollbar rounded-xl border border-slate-200 bg-white divide-x divide-slate-200 shrink-0">
             <button
               type="button"
               onClick={exportExcelC53}
               title="Xuất Excel (.xlsx) chuẩn C53-HD"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
+              aria-label="Xuất Excel"
+              className="inline-flex items-center gap-1 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer whitespace-nowrap shrink-0"
             >
-              <Download className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Excel</span>
+              <Download className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-emerald-600" />
+              <span className="hidden lg:inline">Excel</span>
             </button>
             <button
               type="button"
               onClick={handleExportPdf}
               disabled={exportingPdf || loading}
               title="Tải trực tiếp PDF (.pdf) khổ ngang A4"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition disabled:opacity-50 cursor-pointer"
+              aria-label="Xuất PDF"
+              className="inline-flex items-center gap-1 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition disabled:opacity-50 cursor-pointer whitespace-nowrap shrink-0"
             >
-              <FileText className="w-3.5 h-3.5 text-rose-600" />
-              <span>{exportingPdf ? 'Đang xuất...' : 'PDF'}</span>
+              <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-rose-600" />
+              <span className="hidden lg:inline">{exportingPdf ? 'Đang xuất...' : 'PDF'}</span>
             </button>
             <button
               type="button"
               onClick={() => window.print()}
               title="In / Lưu PDF qua trình duyệt"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              aria-label="In biên bản"
+              className="inline-flex items-center gap-1 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer whitespace-nowrap shrink-0"
             >
-              <Printer className="w-3.5 h-3.5 text-slate-600" />
-              <span>In</span>
+              <Printer className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-slate-600" />
             </button>
             <button
               type="button"
@@ -774,43 +800,26 @@ export default function Inventory() {
               }}
               disabled={loading}
               title="Xuất & In nhiều tem QR kiểm kê trên trang A4"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50/60 hover:bg-blue-100/80 transition disabled:opacity-50 cursor-pointer"
+              aria-label="Xuất tem QR A4"
+              className="inline-flex items-center gap-1 min-h-[34px] sm:min-h-0 px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50/60 hover:bg-blue-100/80 transition disabled:opacity-50 cursor-pointer whitespace-nowrap shrink-0"
             >
-              <QrCode className="w-3.5 h-3.5 text-blue-700" />
-              <span>Tem QR A4</span>
+              <QrCode className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-blue-700" />
+              <span className="hidden md:inline">Tem QR</span>
             </button>
           </div>
-
-          {/* Primary Save CTA (hidden for Read-Only VIEWER) */}
-          {user?.role !== 'VIEWER' && (
-            <button
-              type="button"
-              onClick={handleSaveInventory}
-              disabled={saving || loading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition cursor-pointer"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{saving ? 'Đang lưu...' : 'Lưu kiểm kê'}</span>
-              {dirtyIds.size > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold leading-none tabular-nums">
-                  {dirtyIds.size}
-                </span>
-              )}
-            </button>
-          )}
         </div>
       </div>
 
       {/* 2. UNIFIED DIVISION TABS & COMPACT FILTER STRIP */}
-      <div className="print:hidden bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3 space-y-2.5">
+      <div className="print:hidden bg-white rounded-2xl border border-slate-200/80 shadow-xs p-2.5 sm:p-3 space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Role-scoped Division Tabs */}
-          <div className="flex flex-wrap items-center gap-1">
+          {/* Role-scoped Division Tabs (single swipeable row on mobile) */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar sm:flex-wrap w-full sm:w-auto pb-0.5 sm:pb-0">
             {(!user || user.role === 'ADMIN' || user.role === 'MANAGER_DUOC') && (
               <button
                 type="button"
                 onClick={() => { setInventoryType('DUOC'); setSelectedDeptId(''); setSelectedAssetGroup(''); setPage(1); }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
                   inventoryType === 'DUOC'
                     ? 'bg-blue-700 text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -825,7 +834,7 @@ export default function Inventory() {
               <button
                 type="button"
                 onClick={() => { setInventoryType('CNTT'); setSelectedDeptId(''); setSelectedAssetGroup(''); setPage(1); }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
                   inventoryType === 'CNTT'
                     ? 'bg-blue-700 text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -840,7 +849,7 @@ export default function Inventory() {
               <button
                 type="button"
                 onClick={() => { setInventoryType('TCHC_HC'); setSelectedDeptId(''); setSelectedAssetGroup(''); setPage(1); }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
                   inventoryType === 'TCHC_HC'
                     ? 'bg-blue-700 text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -855,7 +864,7 @@ export default function Inventory() {
               <button
                 type="button"
                 onClick={() => { setInventoryType('TCHC_TOANHA'); setSelectedDeptId(''); setSelectedAssetGroup(''); setPage(1); }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
                   inventoryType === 'TCHC_TOANHA'
                     ? 'bg-blue-700 text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -879,7 +888,7 @@ export default function Inventory() {
                     setSelectedDeptId(departments[0].id.toString());
                   }
                 }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
                   inventoryType === 'BY_DEPT'
                     ? 'bg-blue-700 text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -891,8 +900,8 @@ export default function Inventory() {
             )}
           </div>
 
-          {/* Compact Inventory Date Inline Input */}
-          <label className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+          {/* Compact Inventory Date Inline Input (tucked inside filter drawer on mobile) */}
+          <label className={`${showMobileFilters ? 'inline-flex' : 'hidden'} md:inline-flex items-center gap-1.5 text-xs text-slate-500`}>
             <span>Ngày KK:</span>
             <input
               type="text"
@@ -903,140 +912,161 @@ export default function Inventory() {
           </label>
         </div>
 
-        {/* Single-Row Super Search & Multi-Dimensional Filters */}
+        {/* Search + Mobile Filter Trigger + Selectors */}
         <div className="flex flex-col lg:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="w-3.5 h-3.5 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Siêu tìm kiếm 14 trường: gõ kết hợp Tên, Mã, Khoa, Tầng, Người SD hoặc tầng:3 nhóm:hvac..."
-              value={searchTerm}
-              onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
-              className="w-full pl-8 pr-20 py-1.5 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:border-blue-600 outline-none transition"
-            />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => { setSearchTerm(''); setPage(1); }}
-                  aria-label="Xóa từ khóa tìm kiếm"
-                  className="p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowSmartHints(prev => !prev)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border transition cursor-pointer inline-flex items-center gap-0.5 ${
-                  showSmartHints
-                    ? 'bg-blue-700 text-white border-blue-700'
-                    : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
-                }`}
-              >
-                <Sparkles className="w-2.5 h-2.5" />
-                <span>Cú pháp</span>
-              </button>
-            </div>
-
-            {showSmartHints && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-blue-200 rounded-xl shadow-xl p-2.5 space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-blue-800 inline-flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" />
-                    Trợ lý Siêu Tìm Kiếm Kiểm Kê (1-Click Smart Tags)
-                  </span>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-3.5 h-3.5 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Tìm tên, mã TS, khoa, tầng:3..."
+                value={searchTerm}
+                onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
+                className="w-full pl-8 pr-20 py-2 sm:py-1.5 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:border-blue-600 outline-none transition"
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchTerm && (
                   <button
                     type="button"
-                    onClick={() => setShowSmartHints(false)}
-                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                    onClick={() => { setSearchTerm(''); setPage(1); }}
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    className="p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {SMART_TAG_EXAMPLES.map(item => (
-                    <button
-                      key={item.tag}
-                      type="button"
-                      onClick={() => {
-                        setSearchTerm(prev =>
-                          prev.toLowerCase().includes(item.tag.toLowerCase())
-                            ? prev.split(/\s+/).filter(t => t.toLowerCase() !== item.tag.toLowerCase()).join(' ')
-                            : prev ? `${prev} ${item.tag}` : item.tag
-                        );
-                        setPage(1);
-                      }}
-                      className={`px-2 py-0.5 rounded-lg font-mono text-[11px] border transition cursor-pointer ${
-                        searchTerm.toLowerCase().includes(item.tag.toLowerCase())
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-slate-50 text-slate-700 border-blue-200 hover:border-blue-500'
-                      }`}
-                    >
-                      {item.label}{' '}
-                      <span className="font-sans text-[10px] opacity-75">({item.desc})</span>
-                    </button>
-                  ))}
-                </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowSmartHints(prev => !prev)}
+                  title="Mở gợi ý cú pháp tìm kiếm"
+                  aria-label="Cú pháp tìm kiếm"
+                  className={`p-1 sm:px-1.5 sm:py-0.5 rounded text-[10px] font-semibold border transition cursor-pointer inline-flex items-center gap-0.5 ${
+                    showSmartHints
+                      ? 'bg-blue-700 text-white border-blue-700'
+                      : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3 sm:w-2.5 sm:h-2.5" />
+                  <span className="hidden sm:inline">Cú pháp</span>
+                </button>
               </div>
-            )}
+
+              {showSmartHints && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-blue-200 rounded-xl shadow-xl p-2.5 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-blue-800 inline-flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Trợ lý Siêu Tìm Kiếm Kiểm Kê (1-Click Smart Tags)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSmartHints(false)}
+                      className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {SMART_TAG_EXAMPLES.map(item => (
+                      <button
+                        key={item.tag}
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm(prev =>
+                            prev.toLowerCase().includes(item.tag.toLowerCase())
+                              ? prev.split(/\s+/).filter(t => t.toLowerCase() !== item.tag.toLowerCase()).join(' ')
+                              : prev ? `${prev} ${item.tag}` : item.tag
+                          );
+                          setPage(1);
+                        }}
+                        className={`px-2 py-0.5 rounded-md font-mono text-[11px] border transition cursor-pointer ${
+                          searchTerm.toLowerCase().includes(item.tag.toLowerCase())
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-slate-50 text-slate-700 border-blue-200 hover:border-blue-500'
+                        }`}
+                      >
+                        {item.label}{' '}
+                        <span className="font-sans text-[10px] opacity-75">({item.desc})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((v) => !v)}
+              title="Mở bộ lọc"
+              aria-label="Mở bộ lọc"
+              className={`md:hidden shrink-0 inline-flex items-center justify-center gap-1 min-h-[38px] px-2.5 py-1.5 rounded-md border text-xs font-semibold transition cursor-pointer ${
+                showMobileFilters || selectedDeptId || selectedAssetGroup || statusFilter !== 'ALL' || selectedFloor !== 'Tất cả tầng'
+                  ? 'border-blue-300 bg-blue-50 text-blue-800'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {(selectedDeptId || selectedAssetGroup || statusFilter !== 'ALL' || selectedFloor !== 'Tất cả tầng') && (
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-700" />
+              )}
+            </button>
           </div>
 
-          {user?.role === 'DEPARTMENT' ? (
-            <div className="md:w-56 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 flex items-center truncate">
-              {user.fullName || departments.find(d => d.id === user.departmentId)?.name || 'Khoa / Phòng'}
-            </div>
-          ) : (
-            <select
-              value={selectedDeptId}
-              onChange={e => { setSelectedDeptId(e.target.value); setPage(1); }}
-              className="md:w-56 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 outline-none focus:border-blue-600"
-            >
-              {inventoryType !== 'BY_DEPT' && <option value="">Tất cả Khoa / Phòng ({departments.length})</option>}
-              {departments.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.code} - {d.name.replace(/\s*\((?:Cơ sở|Cs)\s*[12]\)/gi, '')}
-                </option>
-              ))}
-            </select>
-          )}
+          <div className={`${showMobileFilters ? 'flex flex-col' : 'hidden'} md:flex md:flex-row gap-2`}>
+            {user?.role === 'DEPARTMENT' ? (
+              <div className="md:w-56 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 flex items-center truncate">
+                {user.fullName || departments.find(d => d.id === user.departmentId)?.name || 'Khoa / Phòng'}
+              </div>
+            ) : (
+              <select
+                value={selectedDeptId}
+                onChange={e => { setSelectedDeptId(e.target.value); setPage(1); }}
+                className="w-full md:w-56 px-3 py-2 md:py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 outline-none focus:border-blue-600"
+              >
+                {inventoryType !== 'BY_DEPT' && <option value="">Tất cả Khoa / Phòng ({departments.length})</option>}
+                {departments.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.code} - {d.name.replace(/\s*\((?:Cơ sở|Cs)\s*[12]\)/gi, '')}
+                  </option>
+                ))}
+              </select>
+            )}
 
-          {(inventoryType === 'TCHC_HC' || inventoryType === 'TCHC_TOANHA') && (
-            <select
-              value={selectedAssetGroup}
-              onChange={e => { setSelectedAssetGroup(e.target.value); setPage(1); }}
-              className="md:w-44 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 outline-none focus:border-blue-600"
-            >
-              <option value="">Tất cả nhóm TCHC</option>
-              {TCHC_GROUP_OPTIONS.filter(
-                g => g.scope === (inventoryType === 'TCHC_HC' ? 'HC' : 'ME')
-              ).map(g => (
-                <option key={g.value} value={g.value}>{g.label}</option>
-              ))}
-            </select>
-          )}
+            {(inventoryType === 'TCHC_HC' || inventoryType === 'TCHC_TOANHA') && (
+              <select
+                value={selectedAssetGroup}
+                onChange={e => { setSelectedAssetGroup(e.target.value); setPage(1); }}
+                className="w-full md:w-44 px-3 py-2 md:py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 outline-none focus:border-blue-600"
+              >
+                <option value="">Tất cả nhóm TCHC</option>
+                {TCHC_GROUP_OPTIONS.filter(
+                  g => g.scope === (inventoryType === 'TCHC_HC' ? 'HC' : 'ME')
+                ).map(g => (
+                  <option key={g.value} value={g.value}>{g.label}</option>
+                ))}
+              </select>
+            )}
 
-          <select
-            value={statusFilter}
-            onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-            className="md:w-40 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 outline-none focus:border-blue-600"
-          >
-            <option value="ALL">Tất cả tình trạng</option>
-            <option value="DANG_SU_DUNG">Đang sử dụng</option>
-            <option value="HONG">Hỏng</option>
-            <option value="BAO_TRI">Bảo trì</option>
-            <option value="CHO_THANH_LY">ĐN thanh lý</option>
-            <option value="KHONG_SU_DUNG">Không sử dụng</option>
-            <option value="DIFF">Có chênh lệch SL</option>
-          </select>
+            <select
+              value={statusFilter}
+              onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+              className="w-full md:w-40 px-3 py-2 md:py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 outline-none focus:border-blue-600"
+            >
+              <option value="ALL">Tất cả tình trạng</option>
+              <option value="DANG_SU_DUNG">Đang sử dụng</option>
+              <option value="HONG">Hỏng</option>
+              <option value="BAO_TRI">Bảo trì</option>
+              <option value="CHO_THANH_LY">ĐN thanh lý</option>
+              <option value="KHONG_SU_DUNG">Không sử dụng</option>
+              <option value="DIFF">Có chênh lệch SL</option>
+            </select>
+          </div>
         </div>
 
-
-
         {/* 1-Click Floor Pill Strip + 2-Level Super Sort */}
-        <div className="pt-1.5 border-t border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-2">
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-[11px] font-semibold text-slate-500 mr-1 inline-flex items-center gap-1">
+        <div className={`${showMobileFilters ? 'flex' : 'hidden'} md:flex pt-1.5 border-t border-slate-100 flex-col xl:flex-row xl:items-center justify-between gap-2`}>
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar sm:flex-wrap pb-0.5 sm:pb-0">
+            <span className="text-[11px] font-semibold text-slate-500 mr-1 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
               <Building2 className="w-3.5 h-3.5 text-slate-400" />
               Tầng:
             </span>
@@ -1053,7 +1083,7 @@ export default function Inventory() {
                     setSelectedFloor(active && fl.value !== 'Tất cả tầng' ? 'Tất cả tầng' : fl.value);
                     setPage(1);
                   }}
-                  className={`px-2 py-0.5 rounded-lg text-[11px] font-medium border transition cursor-pointer inline-flex items-center gap-1 ${
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium border transition cursor-pointer inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
                     active
                       ? 'bg-blue-700 text-white border-blue-700 font-semibold'
                       : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
@@ -1070,52 +1100,56 @@ export default function Inventory() {
             })}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-[11px] font-semibold text-slate-600 inline-flex items-center gap-1">
-              <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
-              Sắp xếp:
-            </span>
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white overflow-hidden">
-              <select
-                value={sortBy}
-                onChange={e => { setSortBy(e.target.value); setPage(1); }}
-                className="px-2.5 py-1 text-xs font-semibold text-slate-800 bg-white outline-none cursor-pointer"
-              >
-                {SUPER_SORT_FIELDS.map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                className="px-2 py-1 border-l border-slate-200 bg-slate-50 hover:bg-blue-50 text-blue-700 font-semibold text-[11px] inline-flex items-center gap-0.5 cursor-pointer"
-              >
-                {sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                <span>{sortOrder === 'asc' ? 'Thuận' : 'Ngược'}</span>
-              </button>
-            </div>
-
-            <span className="text-[11px] text-slate-400">+ Lớp 2:</span>
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white overflow-hidden">
-              <select
-                value={sortBy2}
-                onChange={e => { setSortBy2(e.target.value); setPage(1); }}
-                className="px-2 py-1 text-xs font-medium text-slate-700 bg-white outline-none cursor-pointer"
-              >
-                <option value="">-- Không --</option>
-                {SUPER_SORT_FIELDS.filter(f => f.value !== sortBy).map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-              {sortBy2 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <span className="text-[11px] font-semibold text-slate-600 inline-flex items-center gap-1">
+                <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
+                Sắp xếp:
+              </span>
+              <div className="inline-flex rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <select
+                  value={sortBy}
+                  onChange={e => { setSortBy(e.target.value); setPage(1); }}
+                  className="px-2.5 py-1 text-xs font-semibold text-slate-800 bg-white outline-none cursor-pointer"
+                >
+                  {SUPER_SORT_FIELDS.map(f => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
                 <button
                   type="button"
-                  onClick={() => setSortOrder2(prev => prev === 'asc' ? 'desc' : 'asc')}
-                  className="px-2 py-1 border-l border-slate-200 bg-amber-50 text-amber-800 font-semibold text-[11px] inline-flex items-center gap-0.5 cursor-pointer"
+                  onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                  className="px-2 py-1 border-l border-slate-200 bg-slate-50 hover:bg-blue-50 text-blue-700 font-semibold text-[11px] inline-flex items-center gap-0.5 cursor-pointer"
                 >
-                  {sortOrder2 === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                  {sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                  <span>{sortOrder === 'asc' ? 'Thuận' : 'Ngược'}</span>
                 </button>
-              )}
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <span className="text-[11px] text-slate-400">+ Lớp 2:</span>
+              <div className="inline-flex rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <select
+                  value={sortBy2}
+                  onChange={e => { setSortBy2(e.target.value); setPage(1); }}
+                  className="px-2 py-1 text-xs font-medium text-slate-700 bg-white outline-none cursor-pointer"
+                >
+                  <option value="">-- Không --</option>
+                  {SUPER_SORT_FIELDS.filter(f => f.value !== sortBy).map(f => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+                {sortBy2 && (
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder2(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className="px-2 py-1 border-l border-slate-200 bg-amber-50 text-amber-800 font-semibold text-[11px] inline-flex items-center gap-0.5 cursor-pointer"
+                  >
+                    {sortOrder2 === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1399,7 +1433,7 @@ export default function Inventory() {
                   type="button"
                   disabled={safePage <= 1}
                   onClick={() => setPage(p => Math.max(1, p - 1))}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Trước</span>
@@ -1411,7 +1445,7 @@ export default function Inventory() {
                   type="button"
                   disabled={safePage >= totalPages}
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
                 >
                   <span>Sau</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -2046,7 +2080,7 @@ export default function Inventory() {
               </div>
               <button 
                 onClick={() => { setShowCommitteeModal(false); setEditingMember(null); }}
-                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600"
+                className="p-1 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600"
               >
                 ✕
               </button>
@@ -2107,14 +2141,14 @@ export default function Inventory() {
                     <button
                       type="button"
                       onClick={() => setEditingMember(null)}
-                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg"
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-md"
                     >
                       Hủy bỏ
                     </button>
                   )}
                   <button
                     type="submit"
-                    className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
+                    className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm"
                   >
                     {editingMember?.id ? 'Cập nhật thành viên' : 'Thêm thành viên'}
                   </button>
@@ -2179,7 +2213,7 @@ export default function Inventory() {
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setShowCommitteeModal(false)}
-                className="px-5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl cursor-pointer"
+                className="px-5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-md cursor-pointer"
               >
                 Đóng & Áp dụng biểu mẫu
               </button>
@@ -2219,7 +2253,7 @@ export default function Inventory() {
                     leaderTitle: 'TỔ TRƯỞNG TỔ CNTT',
                     leaderName: 'KTV. Phan Thanh Hoàn'
                   })}
-                  className="px-2 py-1 bg-blue-100 text-blue-800 rounded-lg font-bold text-[11px] hover:bg-blue-200 cursor-pointer"
+                  className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md font-bold text-[11px] hover:bg-blue-200 cursor-pointer"
                 >
                   💻 Khối CNTT
                 </button>
@@ -2230,7 +2264,7 @@ export default function Inventory() {
                     leaderTitle: 'TRƯỞNG KHOA DƯỢC - VTYT',
                     leaderName: 'DS. Mai Thị Tính'
                   })}
-                  className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px] hover:bg-emerald-200 cursor-pointer"
+                  className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md font-bold text-[11px] hover:bg-emerald-200 cursor-pointer"
                 >
                   🩺 Khối Dược (TBYT)
                 </button>
@@ -2241,7 +2275,7 @@ export default function Inventory() {
                     leaderTitle: 'TRƯỞNG PHÒNG TỔ CHỨC - HÀNH CHÍNH',
                     leaderName: 'Ông. Trần Liên'
                   })}
-                  className="px-2 py-1 bg-amber-100 text-amber-800 rounded-lg font-bold text-[11px] hover:bg-amber-200 cursor-pointer"
+                  className="px-2 py-1 bg-amber-100 text-amber-800 rounded-md font-bold text-[11px] hover:bg-amber-200 cursor-pointer"
                 >
                   🏢 Khối TCHC
                 </button>
@@ -2349,13 +2383,13 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={() => setShowSignaturesModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Đóng
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Lưu Cấu Hình Người Ký
                 </button>
@@ -2393,7 +2427,7 @@ export default function Inventory() {
               </div>
               <button 
                 onClick={() => setShowColumnModal(false)}
-                className="p-1.5 hover:bg-slate-200/60 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1.5 hover:bg-slate-200/60 rounded-md text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 ✕
               </button>
@@ -2408,28 +2442,28 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={() => setTempColumns(DEFAULT_VISIBLE_COLUMNS)}
-                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg text-xs font-semibold cursor-pointer"
+                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-xs font-semibold cursor-pointer"
                 >
                   ⭐ Chuẩn CDC 13 cột (Khuyên dùng)
                 </button>
                 <button
                   type="button"
                   onClick={() => setTempColumns(ALL_INVENTORY_COLUMNS.map(c => c.key))}
-                  className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-lg text-xs font-semibold cursor-pointer"
+                  className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-md text-xs font-semibold cursor-pointer"
                 >
                   📋 Đầy đủ 15 cột (Kèm Sổ sách & Chênh lệch)
                 </button>
                 <button
                   type="button"
                   onClick={() => setTempColumns(['stt', 'name', 'assetCode', 'actualQty', 'user', 'status', 'note'])}
-                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold cursor-pointer"
+                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md text-xs font-semibold cursor-pointer"
                 >
                   ⚡ Rút gọn kiểm đếm hiện trường (7 cột)
                 </button>
                 <button
                   type="button"
                   onClick={() => setTempColumns(['stt', 'name', 'assetCode', 'actualQty', 'price', 'total', 'unit', 'user', 'status', 'note'])}
-                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold cursor-pointer"
+                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md text-xs font-semibold cursor-pointer"
                 >
                   💰 Báo cáo Giá trị & Kế toán (10 cột)
                 </button>
@@ -2497,14 +2531,14 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={() => setShowColumnModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSaveColumns(tempColumns)}
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" /> Áp dụng cấu hình cột
                 </button>

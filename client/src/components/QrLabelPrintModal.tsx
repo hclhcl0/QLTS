@@ -754,7 +754,7 @@ export default function QrLabelPrintModal({
               type="button"
               onClick={handleDownloadHtml}
               disabled={loadingQr || expandedStickers.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5 text-slate-600" />
               <span className="hidden sm:inline">Tải HTML A4</span>
@@ -763,7 +763,7 @@ export default function QrLabelPrintModal({
               type="button"
               onClick={handleDownloadPdf}
               disabled={loadingQr || exportingPdf || expandedStickers.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-800 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-800 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
             >
               <FileText className="w-3.5 h-3.5 text-rose-600" />
               <span>{exportingPdf ? 'Đang tạo PDF...' : 'Tải PDF (A4)'}</span>
@@ -772,7 +772,7 @@ export default function QrLabelPrintModal({
               type="button"
               onClick={handlePrintA4}
               disabled={loadingQr || expandedStickers.length === 0}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer disabled:opacity-50"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>In trang A4 ({a4Pages.length} tờ)</span>
@@ -781,7 +781,7 @@ export default function QrLabelPrintModal({
               type="button"
               onClick={onClose}
               aria-label="Đóng cửa sổ xuất tem QR"
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition cursor-pointer"
+              className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -812,7 +812,7 @@ export default function QrLabelPrintModal({
                             setBatchIndex(idx);
                             setPreviewPageIndex(0);
                           }}
-                          className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition ${
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border cursor-pointer transition ${
                             safeBatchIndex === idx
                               ? 'bg-amber-600 text-white border-amber-600'
                               : 'bg-white text-amber-900 border-amber-300 hover:bg-amber-100'
@@ -843,7 +843,7 @@ export default function QrLabelPrintModal({
                           setLayoutId(p.id);
                           setPreviewPageIndex(0);
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-xl border transition cursor-pointer flex items-center justify-between gap-2 ${
+                        className={`w-full text-left px-3 py-2 rounded-md border transition cursor-pointer flex items-center justify-between gap-2 ${
                           active
                             ? 'border-blue-600 bg-blue-50/70 ring-1 ring-blue-500/30'
                             : 'border-slate-200 hover:border-slate-300 bg-white'
@@ -901,7 +901,7 @@ export default function QrLabelPrintModal({
                   <button
                     type="button"
                     onClick={() => setUseAssetQty(false)}
-                    className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-medium cursor-pointer transition ${
+                    className={`px-2.5 py-1.5 rounded-md border text-[11px] font-medium cursor-pointer transition ${
                       !useAssetQty
                         ? 'bg-blue-700 text-white border-blue-700'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
@@ -912,7 +912,7 @@ export default function QrLabelPrintModal({
                   <button
                     type="button"
                     onClick={() => setUseAssetQty(true)}
-                    className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-medium cursor-pointer transition ${
+                    className={`px-2.5 py-1.5 rounded-md border text-[11px] font-medium cursor-pointer transition ${
                       useAssetQty
                         ? 'bg-blue-700 text-white border-blue-700'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
@@ -997,7 +997,7 @@ export default function QrLabelPrintModal({
                       key={b.id}
                       type="button"
                       onClick={() => setBorderStyle(b.id)}
-                      className={`px-2 py-0.5 rounded-lg text-[11px] border cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md text-[11px] border cursor-pointer ${
                         borderStyle === b.id
                           ? 'bg-slate-800 text-white border-slate-800'
                           : 'bg-white text-slate-600 border-slate-200'
@@ -1179,7 +1179,7 @@ export default function QrLabelPrintModal({
                     type="button"
                     disabled={safePreviewPage <= 0}
                     onClick={() => setPreviewPageIndex((p) => Math.max(0, p - 1))}
-                    className="p-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    className="p-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -1190,7 +1190,7 @@ export default function QrLabelPrintModal({
                     type="button"
                     disabled={safePreviewPage >= a4Pages.length - 1}
                     onClick={() => setPreviewPageIndex((p) => Math.min(a4Pages.length - 1, p + 1))}
-                    className="p-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    className="p-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>

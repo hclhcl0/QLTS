@@ -270,131 +270,133 @@ export default function Calibration() {
   const totalCost = records.reduce((sum, r) => sum + (r.cost || 0), 0);
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* 1. TOP HEADER */}
-      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Khoa Dược - VTYT</span>
-            <h1 className="text-2xl font-bold text-slate-900">Hiệu Chuẩn, Kiểm Định & Kiểm Xạ TBYT</h1>
+    <div className="space-y-4 pb-12">
+      {/* 1. COMPACT HEADER */}
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              Hiệu Chuẩn, Kiểm Định &amp; Kiểm Xạ TBYT
+            </h1>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+              Khoa Dược - VTYT
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Theo dõi định kỳ tính chuẩn xác, độ an toàn & đánh giá chất lượng tiêu chuẩn <strong>ISO 17025</strong> cho trang thiết bị y tế
+          <p className="text-xs text-slate-500 mt-0.5">
+            Theo dõi định kỳ tính chuẩn xác, an toàn bức xạ &amp; chất lượng chuẩn <strong>ISO 17025</strong>
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 shadow-xs transition cursor-pointer"
-            title="Xuất danh sách hiệu chuẩn TBYT ra file Excel với tùy chọn sắp xếp"
+            className="flex items-center gap-1.5 p-2 px-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 shadow-2xs transition cursor-pointer"
+            title="Xuất danh sách hiệu chuẩn TBYT ra file Excel"
+            aria-label="Xuất Excel"
           >
-            <Download className="w-4 h-4 text-emerald-600" /> Xuất Excel
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span className="hidden lg:inline">Excel</span>
           </button>
 
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition cursor-pointer"
+            title="In danh sách A4"
+            aria-label="In A4"
+            className="flex items-center gap-1.5 p-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 shadow-2xs transition cursor-pointer"
           >
-            <Printer className="w-4 h-4" /> In Bảng Theo Dõi A4
+            <Printer className="w-4 h-4 text-slate-600" />
           </button>
           
           {canEdit && (
             <button 
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow transition cursor-pointer"
+              title="Thêm phiếu kiểm định / hiệu chuẩn"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-700 rounded-md hover:bg-blue-800 shadow-xs transition cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Thêm Phiếu Hiệu Chuẩn Mới
+              <Plus className="w-4 h-4" />
+              <span>Thêm KĐ</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. STATS CARDS */}
-      <div className="print:hidden grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tổng số thiết bị</div>
-          <div className="text-xl font-bold text-slate-900 mt-1">
-            {distinctAssetsCount} <span className="text-xs font-normal text-slate-500">thiết bị ({records.length} lượt)</span>
+      {/* 2. UNIFIED METRIC STRIP & FILTER BAR */}
+      <div className="print:hidden bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { key: 'ALL', label: 'Tất cả', count: records.length, sub: `${distinctAssetsCount} TB` },
+              { key: 'HIEU_CHUAN', label: 'Hiệu chuẩn', count: records.filter(r => r.serviceType === 'HIEU_CHUAN').length },
+              { key: 'THU_NGHIEM', label: 'Thử nghiệm', count: records.filter(r => r.serviceType === 'THU_NGHIEM').length },
+              { key: 'KIEM_DINH', label: 'Kiểm định', count: records.filter(r => r.serviceType === 'KIEM_DINH').length },
+              { key: 'KIEM_XA', label: 'Kiểm xạ', count: records.filter(r => r.serviceType === 'KIEM_XA').length },
+            ].map((pill) => {
+              const active = serviceTypeFilter === pill.key;
+              return (
+                <button
+                  key={pill.key}
+                  type="button"
+                  onClick={() => setServiceTypeFilter(pill.key)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-2xs font-semibold'
+                      : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  <span>{pill.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] tabular-nums ${active ? 'bg-white/20 text-white' : 'bg-white text-slate-700'}`}>
+                    {pill.count}
+                  </span>
+                </button>
+              );
+            })}
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs font-medium tabular-nums">
+              Đạt chuẩn: <strong>{records.filter(r => r.result === 'PASS').length}</strong>
+            </span>
+          </div>
+
+          <div className="text-xs font-medium text-slate-600 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200/70 tabular-nums">
+            Tổng kinh phí: <strong className="text-slate-900">{Number(totalCost).toLocaleString('vi-VN')} đ</strong>
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-blue-200 bg-blue-50/40 shadow-xs">
-          <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Hiệu chuẩn</div>
-          <div className="text-xl font-bold text-blue-800 mt-1">
-            {records.filter(r => r.serviceType === 'HIEU_CHUAN').length}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+            <select
+              value={locationFilter}
+              onChange={e => setLocationFilter(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="ALL">Bộ phận sử dụng (Tất cả)</option>
+              <option value="CS1">Cơ sở 1 (118 Lê Đình Lý)</option>
+              <option value="CS2">Cơ sở 2 (Bàn Thạch)</option>
+              <option value="HIV">Bộ phận HIV / AIDS</option>
+              <option value="Virus">Bộ phận Virus / Vi sinh</option>
+              <option value="HL">Bộ phận Hóa lý</option>
+              <option value="CLS">Bộ phận Cận lâm sàng</option>
+            </select>
+
+            <select
+              value={resultFilter}
+              onChange={e => setResultFilter(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="ALL">Kết quả (Tất cả)</option>
+              <option value="PASS">Đạt chuẩn / Tốt</option>
+              <option value="FAIL">Không hoạt động / Cần sửa</option>
+            </select>
           </div>
-        </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-xs">
-          <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Thử nghiệm</div>
-          <div className="text-xl font-bold text-purple-800 mt-1">
-            {records.filter(r => r.serviceType === 'THU_NGHIEM').length}
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Tìm tên thiết bị, mã TBYT, đơn vị..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none w-full"
+            />
           </div>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/40 shadow-xs">
-          <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Đạt ISO / Tốt</div>
-          <div className="text-xl font-bold text-emerald-800 mt-1">
-            {records.filter(r => r.result === 'PASS').length}
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-xs col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Tổng kinh phí</div>
-          <div className="text-sm font-bold text-amber-900 mt-1.5">{Number(totalCost).toLocaleString('vi-VN')} đ</div>
-        </div>
-      </div>
-
-      {/* 3. FILTERS BAR */}
-      <div className="print:hidden bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={serviceTypeFilter}
-            onChange={e => setServiceTypeFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="ALL">-- Tất cả Loại hình --</option>
-            <option value="HIEU_CHUAN">Hiệu chuẩn thiết bị</option>
-            <option value="THU_NGHIEM">Thử nghiệm an toàn sinh học</option>
-            <option value="KIEM_DINH">Kiểm định thiết bị y tế</option>
-            <option value="KIEM_XA">Kiểm xạ an toàn X-quang</option>
-          </select>
-
-          <select
-            value={locationFilter}
-            onChange={e => setLocationFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="ALL">-- Bộ phận sử dụng (Tất cả) --</option>
-            <option value="CS1">Cơ sở 1 (118 Lê Đình Lý)</option>
-            <option value="CS2">Cơ sở 2 (Bàn Thạch)</option>
-            <option value="HIV">Bộ phận HIV / AIDS</option>
-            <option value="Virus">Bộ phận Virus / Vi sinh</option>
-            <option value="HL">Bộ phận Hóa lý</option>
-            <option value="CLS">Bộ phận Cận lâm sàng</option>
-          </select>
-
-          <select
-            value={resultFilter}
-            onChange={e => setResultFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="ALL">-- Kết quả đánh giá --</option>
-            <option value="PASS">Đạt chuẩn / Tốt</option>
-            <option value="FAIL">Không hoạt động / Cần sửa</option>
-          </select>
-        </div>
-
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Tìm tên thiết bị, mã TBYT, đơn vị SMETES..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none w-64"
-          />
         </div>
       </div>
 
@@ -410,7 +412,92 @@ export default function Calibration() {
           isEmpty={filteredRecords.length === 0}
           emptyMessage="Không tìm thấy thiết bị nào phù hợp."
         >
-          <div className="overflow-x-auto">
+          {/* Mobile Card View (< md) */}
+          <div className="md:hidden divide-y divide-slate-100">
+            {!loading &&
+              filteredRecords.map((r) => (
+                <div key={r.id} className="p-3.5 space-y-2 bg-white">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/70 font-mono text-[11px] font-medium text-emerald-700">
+                        {r.asset?.assetCode || '-'}
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
+                          r.serviceType === 'THU_NGHIEM'
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
+                            : r.serviceType === 'KIEM_DINH'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                              : r.serviceType === 'KIEM_XA'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                        }`}
+                      >
+                        {r.serviceType === 'THU_NGHIEM'
+                          ? 'Thử nghiệm'
+                          : r.serviceType === 'KIEM_DINH'
+                            ? 'Kiểm định'
+                            : r.serviceType === 'KIEM_XA'
+                              ? 'Kiểm xạ'
+                              : 'Hiệu chuẩn'}
+                      </span>
+                    </div>
+                    <span
+                      className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                        r.result === 'PASS'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                      }`}
+                    >
+                      {(r as any).deviceStatusAfter || (r.result === 'PASS' ? 'Tốt' : 'Không đạt')}
+                    </span>
+                  </div>
+
+                  <div className="font-heading text-sm font-semibold text-slate-900 leading-snug">
+                    {r.asset?.name}
+                  </div>
+
+                  <div className="text-xs text-slate-500 space-y-0.5">
+                    <div>
+                      {(r as any).departmentLocation || r.asset?.department?.name || 'CDC'} ·{' '}
+                      <strong className="text-slate-700">{r.vendor || 'TT SMETES'}</strong>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 tabular-nums">
+                      <span>
+                        KĐ: <strong>{new Date(r.calibrationDate).toLocaleDateString('vi-VN')}</strong>
+                        {r.nextCalibrationDate ? ` → ${new Date(r.nextCalibrationDate).toLocaleDateString('vi-VN')}` : ''}
+                      </span>
+                      <span className="font-semibold text-slate-800">
+                        {r.cost ? Number(r.cost).toLocaleString('vi-VN') : '0'} đ
+                      </span>
+                    </div>
+                  </div>
+
+                  {canEdit && (
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(r)}
+                        className="flex-1 min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-blue-50 text-blue-700 text-xs font-semibold cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Cập nhật KĐ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRecord(r.id)}
+                        className="min-h-[38px] px-3 py-1.5 rounded-md border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-medium cursor-pointer"
+                        title="Xóa hồ sơ"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
                 <tr>
@@ -760,13 +847,13 @@ export default function Calibration() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Lưu Hồ Sơ Hiệu Chuẩn
                 </button>
@@ -969,13 +1056,13 @@ export default function Calibration() {
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Cập Nhật Hồ Sơ
                 </button>
@@ -1007,15 +1094,15 @@ export default function Calibration() {
                   onChange={e => setExportSortBy(e.target.value)}
                   className="w-full p-2.5 border border-slate-300 rounded-xl font-semibold bg-white outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="fundingSource">💰 Nguồn kinh phí (Thu sự nghiệp, Ngân sách, Dịch vụ y tế...)</option>
-                  <option value="result">📌 Kết quả đánh giá / Tình trạng (Đạt chuẩn, Không đạt...)</option>
-                  <option value="serviceType">🔬 Loại hình dịch vụ (Hiệu chuẩn, Thử nghiệm, Kiểm định, Kiểm xạ)</option>
-                  <option value="decisionNumber">📜 Số quyết định phê duyệt (QĐ số 34...)</option>
-                  <option value="location">🏛️ Bộ phận / Khoa phòng sử dụng (HIV, Virus, Hóa lý...)</option>
-                  <option value="date">📅 Ngày thực hiện</option>
-                  <option value="nextDate">⏳ Hạn hiệu chuẩn kế tiếp</option>
-                  <option value="cost">💵 Kinh phí thực hiện</option>
-                  <option value="assetCode">🏷️ Mã thiết bị y tế (TBYT Code)</option>
+                  <option value="fundingSource">Nguồn kinh phí (Thu sự nghiệp, Ngân sách, Dịch vụ y tế...)</option>
+                  <option value="result">Kết quả đánh giá / Tình trạng (Đạt chuẩn, Không đạt...)</option>
+                  <option value="serviceType">Loại hình dịch vụ (Hiệu chuẩn, Thử nghiệm, Kiểm định, Kiểm xạ)</option>
+                  <option value="decisionNumber">Số quyết định phê duyệt (QĐ số 34...)</option>
+                  <option value="location">Bộ phận / Khoa phòng sử dụng (HIV, Virus, Hóa lý...)</option>
+                  <option value="date">Ngày thực hiện</option>
+                  <option value="nextDate">Hạn hiệu chuẩn kế tiếp</option>
+                  <option value="cost">Kinh phí thực hiện</option>
+                  <option value="assetCode">Mã thiết bị y tế (TBYT Code)</option>
                 </select>
               </div>
 
@@ -1025,44 +1112,44 @@ export default function Calibration() {
                   <button
                     type="button"
                     onClick={() => setExportSortOrder('asc')}
-                    className={`p-2.5 rounded-xl border text-center font-bold cursor-pointer transition ${
+                    className={`p-2.5 rounded-md border text-center font-bold cursor-pointer transition ${
                       exportSortOrder === 'asc'
                         ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Tăng dần (A ➔ Z / Cũ ➔ Mới)
+                    Tăng dần (A - Z / Cũ - Mới)
                   </button>
                   <button
                     type="button"
                     onClick={() => setExportSortOrder('desc')}
-                    className={`p-2.5 rounded-xl border text-center font-bold cursor-pointer transition ${
+                    className={`p-2.5 rounded-md border text-center font-bold cursor-pointer transition ${
                       exportSortOrder === 'desc'
                         ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Giảm dần (Z ➔ A / Mới ➔ Cũ)
+                    Giảm dần (Z - A / Mới - Cũ)
                   </button>
                 </div>
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-xl text-emerald-800 text-[11px]">
-                <p>💡 File Excel xuất ra sẽ được định dạng chuẩn Khoa Dược CDC Đà Nẵng, có kẻ bảng, tổng hợp kinh phí bằng công thức SUM và sẵn 3 khối chữ ký (Người lập, Trưởng Khoa Dược, Ban Giám Đốc).</p>
+                <p>File Excel xuất ra sẽ được định dạng chuẩn Khoa Dược CDC Đà Nẵng, có kẻ bảng, tổng hợp kinh phí bằng công thức SUM và sẵn 3 khối chữ ký (Người lập, Trưởng Khoa Dược, Ban Giám Đốc).</p>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowExportModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Đóng
                 </button>
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-4 h-4" /> Tải File Excel
                 </button>

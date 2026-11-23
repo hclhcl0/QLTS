@@ -54,6 +54,7 @@ export default function Maintenance() {
   const [unitFilter, setUnitFilter] = useState('ALL');
   const { density, setDensity, cellPy, headPy } = useTablePrefs('maintenance');
   const [deptFilter, setDeptFilter] = useState('ALL');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Periodic Report Filter State
   const [reportPeriodType, setReportPeriodType] = useState<'MONTH' | 'QUARTER' | 'YEAR'>('MONTH');
@@ -437,33 +438,41 @@ export default function Maintenance() {
   const totalCost = requests.reduce((sum, r) => sum + (r.repairCost || 0), 0);
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* 1. TOP HEADER */}
-      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">Quy trình điều phối & báo cáo</span>
-            <h1 className="text-2xl font-bold text-slate-900">Báo Hỏng & Sửa Chữa Thiết Bị</h1>
+    <div className="space-y-4 pb-12">
+      {/* 1. COMPACT HEADER */}
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              Báo Hỏng &amp; Sửa Chữa Thiết Bị
+            </h1>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/80">
+              Dược · CNTT · TCHC
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Khoa/Phòng báo hỏng ➔ Điều phối về <strong className="text-slate-700 font-semibold">Khoa Dược / Tổ CNTT / Phòng TCHC</strong> ➔ Xử lý &amp; Báo cáo định kỳ
+          <p className="hidden sm:block text-xs text-slate-500 mt-0.5">
+            Khoa/Phòng gửi yêu cầu, điều phối trực tiếp về đơn vị chuyên trách và theo dõi tiến độ xử lý
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {user?.role === 'ADMIN' ? (
             <button
               type="button"
               onClick={() => navigate('/settings')}
-              title="Cài đặt Bot Telegram thông báo báo hỏng & sửa chữa"
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition cursor-pointer ${
+              title={telegramActive ? 'Telegram đang bật — Bấm để cài đặt' : 'Cài đặt Bot Telegram thông báo'}
+              aria-label="Cài đặt Telegram"
+              className={`relative flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-2.5 py-1.5 sm:py-2 text-xs font-semibold rounded-md border transition cursor-pointer ${
                 telegramActive
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
                   : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
               }`}
             >
               <Settings className="w-4 h-4" />
-              <span>{telegramActive ? 'Telegram: Bật' : 'Cài đặt Telegram'}</span>
+              <span className="hidden lg:inline">Telegram</span>
+              <span
+                className={`w-2 h-2 rounded-full ${telegramActive ? 'bg-emerald-500' : 'bg-amber-500'}`}
+              />
             </button>
           ) : telegramActive !== null ? (
             <span
@@ -472,30 +481,35 @@ export default function Maintenance() {
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                   : 'bg-slate-50 border-slate-200 text-slate-500'
               }`}
+              title={telegramActive ? 'Telegram thông báo đang bật' : 'Telegram chưa bật'}
             >
               <span className={`w-2 h-2 rounded-full ${telegramActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-              <span>{telegramActive ? 'Telegram: Đang bật' : 'Telegram: Chưa bật'}</span>
+              <span className="hidden sm:inline">{telegramActive ? 'Telegram: Bật' : 'TG: Tắt'}</span>
             </span>
           ) : null}
 
           <button
             onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 shadow-sm transition cursor-pointer"
-            title="Xuất file Excel danh sách sửa chữa bảo trì với tùy chọn sắp xếp"
+            className="flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-2.5 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 shadow-sm transition cursor-pointer"
+            title="Xuất file Excel danh sách sửa chữa bảo trì"
+            aria-label="Xuất Excel"
           >
-            <Download className="w-4 h-4 text-emerald-600" /> Xuất Excel
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span className="hidden lg:inline">Excel</span>
           </button>
 
           <button
             onClick={() => setActiveTab(activeTab === 'LIST' ? 'REPORT' : 'LIST')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition cursor-pointer ${
+            title={activeTab === 'REPORT' ? 'Quay lại danh sách phiếu' : 'Xem Báo cáo Tháng / Quý / Năm'}
+            aria-label={activeTab === 'REPORT' ? 'Danh sách phiếu' : 'Báo cáo thống kê'}
+            className={`flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold rounded-md border transition cursor-pointer ${
               activeTab === 'REPORT' 
                 ? 'bg-purple-50 border-purple-300 text-purple-800' 
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
           >
-            <BarChart2 className="w-4 h-4 text-purple-600" /> 
-            {activeTab === 'REPORT' ? 'Quay lại danh sách' : 'Báo Cáo Tháng / Quý / Năm'}
+            <BarChart2 className="w-4 h-4 text-purple-600" />
+            <span className="hidden md:inline">{activeTab === 'REPORT' ? 'Danh sách' : 'Báo cáo'}</span>
           </button>
 
           {user?.role !== 'VIEWER' && (
@@ -504,152 +518,129 @@ export default function Maintenance() {
                 setCreateInitialAssetId(null);
                 setShowCreateModal(true);
               }}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow transition cursor-pointer"
+              title="Tạo phiếu báo hỏng / sửa chữa thiết bị mới"
+              className="flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-3 py-1.5 sm:py-2 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 shadow transition cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Báo Hỏng / Sửa Chữa Mới
+              <Plus className="w-4 h-4" />
+              <span>Báo hỏng</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. VISUAL STATUS STEPPER & SUMMARY CARDS */}
-      <div className="print:hidden grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <button
-          type="button"
-          onClick={() => { setActiveTab('LIST'); setStatusFilter('ALL'); }}
-          className={`text-left bg-white p-3.5 rounded-2xl border shadow-xs transition cursor-pointer ${
-            statusFilter === 'ALL'
-              ? 'border-blue-600 ring-1 ring-blue-500/30'
-              : 'border-slate-200/80 hover:border-slate-300'
-          }`}
-        >
-          <div className="text-[11px] font-heading font-semibold text-slate-500">Tổng thiết bị hỏng</div>
-          <div className="font-heading text-xl font-bold text-slate-900 tabular-nums mt-1">
-            {distinctAssetsCount} <span className="text-xs font-normal text-slate-400">thiết bị</span>
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Toàn bộ danh sách</div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setActiveTab('LIST'); setStatusFilter(statusFilter === 'PENDING' ? 'ALL' : 'PENDING'); }}
-          className={`text-left bg-white p-3.5 rounded-2xl border border-l-4 border-l-amber-500 shadow-xs transition cursor-pointer ${
-            statusFilter === 'PENDING'
-              ? 'border-amber-500 ring-1 ring-amber-400/40 bg-amber-50/30'
-              : 'border-slate-200/80 hover:border-amber-300'
-          }`}
-        >
-          <div className="flex items-center justify-between text-[11px] font-heading font-semibold text-amber-700">
-            <span>1. Chờ tiếp nhận</span>
-            <Clock className="w-3.5 h-3.5" />
-          </div>
-          <div className="font-heading text-xl font-bold text-amber-800 tabular-nums mt-1">
-            {distinctPendingCount} <span className="text-xs font-normal text-amber-600">thiết bị</span>
-          </div>
-          <div className="text-[11px] text-amber-700/80 mt-0.5">Bấm để lọc nhanh →</div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setActiveTab('LIST'); setStatusFilter(statusFilter === 'IN_PROGRESS' ? 'ALL' : 'IN_PROGRESS'); }}
-          className={`text-left bg-white p-3.5 rounded-2xl border border-l-4 border-l-blue-600 shadow-xs transition cursor-pointer ${
-            statusFilter === 'IN_PROGRESS'
-              ? 'border-blue-600 ring-1 ring-blue-500/40 bg-blue-50/30'
-              : 'border-slate-200/80 hover:border-blue-300'
-          }`}
-        >
-          <div className="flex items-center justify-between text-[11px] font-heading font-semibold text-blue-700">
-            <span>2. Đang xử lý</span>
-            <Wrench className="w-3.5 h-3.5" />
-          </div>
-          <div className="font-heading text-xl font-bold text-blue-800 tabular-nums mt-1">
-            {distinctInProgressCount} <span className="text-xs font-normal text-blue-600">thiết bị</span>
-          </div>
-          <div className="text-[11px] text-blue-700/80 mt-0.5">Đang sửa chữa →</div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setActiveTab('LIST'); setStatusFilter(statusFilter === 'COMPLETED' ? 'ALL' : 'COMPLETED'); }}
-          className={`text-left bg-white p-3.5 rounded-2xl border border-l-4 border-l-emerald-600 shadow-xs transition cursor-pointer ${
-            statusFilter === 'COMPLETED'
-              ? 'border-emerald-600 ring-1 ring-emerald-500/40 bg-emerald-50/30'
-              : 'border-slate-200/80 hover:border-emerald-300'
-          }`}
-        >
-          <div className="flex items-center justify-between text-[11px] font-heading font-semibold text-emerald-700">
-            <span>3. Đã hoàn thành</span>
-            <CheckCircle className="w-3.5 h-3.5" />
-          </div>
-          <div className="font-heading text-xl font-bold text-emerald-800 tabular-nums mt-1">
-            {distinctCompletedCount} <span className="text-xs font-normal text-emerald-600">thiết bị</span>
-          </div>
-          <div className="text-[11px] text-emerald-700/80 mt-0.5">Đã nghiệm thu →</div>
-        </button>
-
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-heading font-semibold text-slate-500">Tổng kinh phí</div>
-          <div className="font-heading text-base font-bold text-slate-900 tabular-nums mt-1.5">
-            {Number(totalCost).toLocaleString('vi-VN')} đ
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Cộng dồn tất cả phiếu</div>
-        </div>
-      </div>
-
       {/* ========================================================================= */}
-      {/* 3. TAB 1: DANH SÁCH YÊU CẦU BÁO HỎNG & TIẾP NHẬN XỬ LÝ                     */}
+      {/* 2. UNIFIED METRIC STRIP & FILTER BAR (CLINICAL SWISS 3-TIER)              */}
       {/* ========================================================================= */}
       {activeTab === 'LIST' && (
         <div className="print:hidden space-y-3">
-          {/* Filters bar */}
-          <div className="p-4 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={unitFilter}
-                onChange={e => setUnitFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="ALL">-- Đơn vị tiếp nhận (Tất cả) --</option>
-                <option value="DUOC">Khoa Dược (TBYT)</option>
-                <option value="CNTT">Tổ CNTT</option>
-                <option value="TCHC">Phòng TCHC</option>
-              </select>
+          <div className="p-2.5 sm:p-3.5 bg-white rounded-2xl shadow-xs border border-slate-200/80 space-y-2.5">
+            {/* Top Strip: Single-Row Swipeable Status Pills + Cost */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar sm:flex-wrap pb-0.5 sm:pb-0">
+                {[
+                  { key: 'ALL', label: 'Tất cả', count: distinctAssetsCount, activeCls: 'bg-slate-900 text-white' },
+                  { key: 'PENDING', label: 'Chờ tiếp nhận', count: distinctPendingCount, activeCls: 'bg-amber-600 text-white' },
+                  { key: 'IN_PROGRESS', label: 'Đang xử lý', count: distinctInProgressCount, activeCls: 'bg-blue-700 text-white' },
+                  { key: 'COMPLETED', label: 'Đã hoàn thành', count: distinctCompletedCount, activeCls: 'bg-emerald-700 text-white' },
+                ].map((pill) => {
+                  const active = statusFilter === pill.key;
+                  return (
+                    <button
+                      key={pill.key}
+                      type="button"
+                      onClick={() => setStatusFilter(active && pill.key !== 'ALL' ? 'ALL' : pill.key)}
+                      className={`inline-flex items-center gap-1.5 min-h-[34px] sm:min-h-0 px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
+                        active
+                          ? `${pill.activeCls} shadow-2xs font-semibold`
+                          : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70'
+                      }`}
+                    >
+                      <span>{pill.label}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded-full text-[10px] tabular-nums ${
+                          active ? 'bg-white/20 text-white' : 'bg-white text-slate-700'
+                        }`}
+                      >
+                        {pill.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-              {user?.role !== 'DEPARTMENT' && (
-                <select
-                  value={deptFilter}
-                  onChange={e => setDeptFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="ALL">-- Khoa / Phòng gửi yêu cầu --</option>
-                  {departments.map(d => (
-                    <option key={d.id} value={d.id.toString()}>{d.code} - {d.name}</option>
-                  ))}
-                </select>
-              )}
-
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="ALL">-- Trạng thái --</option>
-                <option value="PENDING">Chờ tiếp nhận</option>
-                <option value="IN_PROGRESS">Đang xử lý</option>
-                <option value="COMPLETED">Đã hoàn thành</option>
-                <option value="REJECTED">Từ chối</option>
-              </select>
+              <div className="text-[11px] sm:text-xs font-medium text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/70 tabular-nums self-start sm:self-auto whitespace-nowrap shrink-0">
+                Tổng KP: <strong className="text-slate-900">{Number(totalCost).toLocaleString('vi-VN')} đ</strong>
+              </div>
             </div>
 
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Tìm mã thiết bị, người báo, sự cố..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none w-56 sm:w-64"
-              />
+            {/* Bottom Strip: Search + Mobile Filter Toggle + Selectors */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+              <div className="flex items-center gap-2 w-full md:w-64 md:order-2">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm mã TB, UltraViewer, người báo..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none w-full"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMobileFilters((v) => !v)}
+                  title="Mở bộ lọc"
+                  aria-label="Mở bộ lọc"
+                  className={`md:hidden shrink-0 inline-flex items-center justify-center gap-1 min-h-[38px] px-2.5 py-1.5 rounded-md border text-xs font-semibold transition cursor-pointer ${
+                    showMobileFilters || unitFilter !== 'ALL' || deptFilter !== 'ALL'
+                      ? 'border-blue-300 bg-blue-50 text-blue-800'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Filter className="w-4 h-4" />
+                  {(unitFilter !== 'ALL' || deptFilter !== 'ALL') && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-700" />
+                  )}
+                </button>
+              </div>
+
+              <div className={`${showMobileFilters ? 'grid' : 'hidden'} md:flex grid-cols-1 sm:flex-wrap items-center gap-2 w-full md:w-auto md:order-1`}>
+                <select
+                  value={unitFilter}
+                  onChange={e => setUnitFilter(e.target.value)}
+                  className="w-full sm:w-auto px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="ALL">Đơn vị tiếp nhận (Tất cả)</option>
+                  <option value="DUOC">Khoa Dược (TBYT)</option>
+                  <option value="CNTT">Tổ CNTT</option>
+                  <option value="TCHC">Phòng TCHC</option>
+                </select>
+
+                {user?.role !== 'DEPARTMENT' && (
+                  <select
+                    value={deptFilter}
+                    onChange={e => setDeptFilter(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="ALL">Khoa / Phòng (Tất cả)</option>
+                    {departments.map(d => (
+                      <option key={d.id} value={d.id.toString()}>{d.code} - {d.name}</option>
+                    ))}
+                  </select>
+                )}
+
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="w-full sm:w-auto px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="ALL">Trạng thái (Tất cả)</option>
+                  <option value="PENDING">Chờ tiếp nhận</option>
+                  <option value="IN_PROGRESS">Đang xử lý</option>
+                  <option value="COMPLETED">Đã hoàn thành</option>
+                  <option value="REJECTED">Từ chối</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -664,7 +655,134 @@ export default function Maintenance() {
             isEmpty={filteredRequests.length === 0}
             emptyMessage="Chưa có phiếu báo hỏng nào phù hợp."
           >
-            <div className="overflow-x-auto">
+            {/* Mobile Card View (< md) */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {!loading &&
+                filteredRequests.map((r) => (
+                  <div key={r.id} className="p-3.5 space-y-2.5 bg-white">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 font-mono text-[11px] font-medium text-blue-700">
+                          {r.asset?.assetCode || 'N/A'}
+                        </span>
+                        {r.issueType === 'SOFTWARE' && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[10px] font-semibold">
+                            <Laptop className="w-2.5 h-2.5" /> Phần mềm
+                          </span>
+                        )}
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
+                            r.priority === 'URGENT'
+                              ? 'bg-rose-50 text-rose-700'
+                              : r.priority === 'HIGH'
+                                ? 'bg-orange-50 text-orange-700'
+                                : r.priority === 'MEDIUM'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {PRIORITY_LABELS[r.priority] || r.priority}
+                        </span>
+                      </div>
+
+                      <span
+                        className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                          r.status === 'COMPLETED'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                            : r.status === 'IN_PROGRESS'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                              : r.status === 'REJECTED'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                                : 'bg-amber-50 text-amber-800 border border-amber-200/70'
+                        }`}
+                      >
+                        {r.status === 'COMPLETED'
+                          ? 'Đã hoàn thành'
+                          : r.status === 'IN_PROGRESS'
+                            ? 'Đang xử lý'
+                            : r.status === 'REJECTED'
+                              ? 'Từ chối'
+                              : 'Chờ tiếp nhận'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="font-heading text-sm font-semibold text-slate-900 leading-snug">
+                        {r.asset?.name || (r as any).assetName || 'Thiết bị'}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600 leading-snug line-clamp-2 break-words">
+                        {r.issueDescription}
+                      </p>
+                    </div>
+
+                    {(r.ultraViewId || parseAttachments(r.attachments).length > 0) && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {r.ultraViewId && (
+                          <button
+                            type="button"
+                            onClick={() => copyText(r.ultraViewId!, 'ID UltraViewer')}
+                            className="inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 font-mono text-[11px] font-semibold cursor-pointer"
+                          >
+                            <Laptop className="w-3 h-3 shrink-0" />
+                            <span>UV: {r.ultraViewId}{r.ultraViewPass ? ` / ${r.ultraViewPass}` : ''}</span>
+                            <Copy className="w-3 h-3 opacity-70" />
+                          </button>
+                        )}
+                        {parseAttachments(r.attachments).length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDetail(r, 'PROPOSAL')}
+                            className="inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium cursor-pointer"
+                          >
+                            <Camera className="w-3 h-3" />
+                            <span>{parseAttachments(r.attachments).length} ảnh lỗi</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="text-xs text-slate-500 flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-100">
+                      <div className="min-w-0 truncate">
+                        <strong className="text-slate-700">{r.department?.name || 'CDC'}</strong> · {r.requestedBy}
+                        {r.contactPhone ? ` (${r.contactPhone})` : ''}
+                      </div>
+                      <div className="font-semibold text-slate-800 tabular-nums shrink-0">
+                        {(r as any).managingUnit === 'DUOC' ? 'Khoa Dược' : (r as any).managingUnit === 'CNTT' ? 'Tổ CNTT' : 'TCHC'}
+                        {r.repairCost ? ` · ${Number(r.repairCost).toLocaleString('vi-VN')} đ` : ''}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenProcess(r)}
+                        className="flex-1 min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-semibold cursor-pointer"
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>Xử lý</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDetail(r, 'PROPOSAL')}
+                        className="flex-1 min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-medium cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Chi tiết / In</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(r)}
+                        className="min-h-[38px] px-2.5 py-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium cursor-pointer"
+                        title="Chỉnh sửa phiếu"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs text-left border-collapse">
                 <thead className="bg-slate-50/90 text-slate-600 font-heading font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
                   <tr>
@@ -874,7 +992,7 @@ export default function Maintenance() {
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                 <button
                   onClick={() => setReportPeriodType('MONTH')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                     reportPeriodType === 'MONTH' ? 'bg-white shadow text-blue-700' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -882,7 +1000,7 @@ export default function Maintenance() {
                 </button>
                 <button
                   onClick={() => setReportPeriodType('QUARTER')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                     reportPeriodType === 'QUARTER' ? 'bg-white shadow text-blue-700' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -890,7 +1008,7 @@ export default function Maintenance() {
                 </button>
                 <button
                   onClick={() => setReportPeriodType('YEAR')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                     reportPeriodType === 'YEAR' ? 'bg-white shadow text-blue-700' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -936,7 +1054,7 @@ export default function Maintenance() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowSignaturesModal(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-md text-xs font-bold transition cursor-pointer"
                 title="Tùy chỉnh chức danh và họ tên người ký dưới báo cáo"
               >
                 <Users className="w-4 h-4 text-blue-600" /> Cấu hình Người ký
@@ -944,7 +1062,7 @@ export default function Maintenance() {
 
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow transition cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-bold shadow transition cursor-pointer"
                 title="Xuất trực tiếp sang file PDF hoặc in ấn báo cáo chuẩn A4"
               >
                 <Printer className="w-4 h-4" /> Xuất PDF / In Báo Cáo A4
@@ -980,7 +1098,7 @@ export default function Maintenance() {
             </div>
 
             {/* KPI Summary Row */}
-            <div className="grid grid-cols-4 gap-3 font-sans text-xs mb-6 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 print:grid-cols-4 gap-3 font-sans text-xs mb-6 text-center">
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="text-slate-500 font-medium">Tổng thiết bị hỏng / sửa</div>
                 <div className="text-lg font-bold text-slate-900 mt-0.5">{reportData?.summary?.distinctAssetCount || reportData?.summary?.total || 0} thiết bị</div>
@@ -1080,7 +1198,7 @@ export default function Maintenance() {
             {/* Report Signatures */}
             <div className="font-sans text-xs sm:text-sm pt-4">
               <div className="text-right italic mb-4">Đà Nẵng, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</div>
-              <div className="grid grid-cols-3 gap-6 text-center">
+              <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-6 text-center">
                 <div>
                   <div className="font-bold uppercase text-slate-900">{signatures.reporterTitle}</div>
                   <div className="text-[11px] italic text-slate-500 mb-20">(Ký, ghi rõ họ tên)</div>
@@ -1168,7 +1286,7 @@ export default function Maintenance() {
                     <button
                       type="button"
                       onClick={() => copyText(selectedRequest.ultraViewId!, 'ID UltraViewer')}
-                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <Copy className="w-3 h-3" /> Copy ID
                     </button>
@@ -1176,7 +1294,7 @@ export default function Maintenance() {
                       <button
                         type="button"
                         onClick={() => copyText(selectedRequest.ultraViewPass!, 'Mật khẩu UltraViewer')}
-                        className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-1 bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-md text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <KeyRound className="w-3 h-3" /> Copy MK
                       </button>
@@ -1216,9 +1334,9 @@ export default function Maintenance() {
                   onChange={e => setProcessData({ ...processData, status: e.target.value })}
                   className="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                 >
-                  <option value="IN_PROGRESS">🔄 Đang xử lý / Đang sửa chữa</option>
-                  <option value="COMPLETED">✅ Đã hoàn thành (Thiết bị hoạt động bình thường)</option>
-                  <option value="REJECTED">❌ Từ chối / Chuyển đề xuất thanh lý</option>
+                  <option value="IN_PROGRESS">Đang xử lý / Đang sửa chữa</option>
+                  <option value="COMPLETED">Đã hoàn thành (Thiết bị hoạt động bình thường)</option>
+                  <option value="REJECTED">Từ chối / Chuyển đề xuất thanh lý</option>
                 </select>
               </div>
 
@@ -1234,7 +1352,7 @@ export default function Maintenance() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 uppercase mb-1">Quyết định số / Phê duyệt</label>
                   <input
@@ -1262,7 +1380,7 @@ export default function Maintenance() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 uppercase mb-1">Chi phí sửa chữa (đ)</label>
                   <input
@@ -1286,7 +1404,7 @@ export default function Maintenance() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 uppercase mb-1">Linh kiện thay thế</label>
                   <input
@@ -1325,13 +1443,13 @@ export default function Maintenance() {
                 <button
                   type="button"
                   onClick={() => setShowProcessModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Lưu Cập Nhật Tiến Độ
                 </button>
@@ -1372,9 +1490,9 @@ export default function Maintenance() {
                     techTitle: 'TỔ TRƯỞNG TỔ CNTT',
                     techName: 'KTV. Phan Thanh Hoàn'
                   })}
-                  className="px-2 py-1 bg-blue-100 text-blue-800 rounded-lg font-bold text-[11px] hover:bg-blue-200 cursor-pointer"
+                  className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md font-bold text-[11px] hover:bg-blue-200 cursor-pointer"
                 >
-                  💻 Khối CNTT
+                  Khối CNTT
                 </button>
                 <button
                   type="button"
@@ -1383,9 +1501,9 @@ export default function Maintenance() {
                     techTitle: 'TRƯỞNG KHOA DƯỢC - VTYT',
                     techName: 'DS. Trưởng Khoa Dược'
                   })}
-                  className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px] hover:bg-emerald-200 cursor-pointer"
+                  className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md font-bold text-[11px] hover:bg-emerald-200 cursor-pointer"
                 >
-                  🩺 Khối Dược (TBYT)
+                  Khối Dược (TBYT)
                 </button>
                 <button
                   type="button"
@@ -1394,9 +1512,9 @@ export default function Maintenance() {
                     techTitle: 'TRƯỞNG PHÒNG TỔ CHỨC - HÀNH CHÍNH',
                     techName: 'Trưởng phòng TCHC'
                   })}
-                  className="px-2 py-1 bg-amber-100 text-amber-800 rounded-lg font-bold text-[11px] hover:bg-amber-200 cursor-pointer"
+                  className="px-2 py-1 bg-amber-100 text-amber-800 rounded-md font-bold text-[11px] hover:bg-amber-200 cursor-pointer"
                 >
-                  🏢 Khối TCHC
+                  Khối TCHC
                 </button>
               </div>
 
@@ -1479,13 +1597,13 @@ export default function Maintenance() {
                 <button
                   type="button"
                   onClick={() => setShowSignaturesModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Đóng
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Lưu Cấu Hình Người Ký
                 </button>
@@ -1539,10 +1657,10 @@ export default function Maintenance() {
                     onChange={e => setEditData({ ...editData, managingUnit: e.target.value })}
                     className="w-full p-2.5 border border-slate-300 rounded-xl bg-blue-50/70 text-blue-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none text-xs"
                   >
-                    <option value="ALL">📋 Tất cả các khối (CNTT, Dược, TCHC)</option>
-                    <option value="CNTT">💻 Khối Thiết bị CNTT (Tổ CNTT)</option>
-                    <option value="DUOC">🩺 Khối Trang thiết bị Y tế (Khoa Dược)</option>
-                    <option value="TCHC">🏢 Khối Thiết bị Hành chính (Phòng TCHC)</option>
+                    <option value="ALL">Tất cả các khối (CNTT, Dược, TCHC)</option>
+                    <option value="CNTT">Khối Thiết bị CNTT (Tổ CNTT)</option>
+                    <option value="DUOC">Khối Trang thiết bị Y tế (Khoa Dược)</option>
+                    <option value="TCHC">Khối Thiết bị Hành chính (Phòng TCHC)</option>
                   </select>
                 </div>
               </div>
@@ -1567,7 +1685,7 @@ export default function Maintenance() {
                   <button
                     type="button"
                     onClick={() => setEditData({ ...editData, managingUnit: 'ALL' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       editData.managingUnit === 'ALL'
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -1578,35 +1696,35 @@ export default function Maintenance() {
                   <button
                     type="button"
                     onClick={() => setEditData({ ...editData, managingUnit: 'CNTT' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       editData.managingUnit === 'CNTT'
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
                     }`}
                   >
-                    💻 Tổ CNTT
+                    Tổ CNTT
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditData({ ...editData, managingUnit: 'DUOC' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       editData.managingUnit === 'DUOC'
                         ? 'bg-emerald-600 text-white shadow-xs'
                         : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                     }`}
                   >
-                    🩺 Khoa Dược (TBYT)
+                    Khoa Dược (TBYT)
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditData({ ...editData, managingUnit: 'TCHC' })}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
                       editData.managingUnit === 'TCHC'
                         ? 'bg-amber-600 text-white shadow-xs'
                         : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
                     }`}
                   >
-                    🏢 Phòng TCHC
+                    Phòng TCHC
                   </button>
                 </div>
 
@@ -1722,9 +1840,9 @@ export default function Maintenance() {
                     onChange={e => setEditData({ ...editData, issueType: e.target.value })}
                     className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none font-medium"
                   >
-                    <option value="HARDWARE">🔧 Lỗi phần cứng / Thiết bị</option>
-                    <option value="SOFTWARE">💻 Lỗi phần mềm / Hỗ trợ từ xa</option>
-                    <option value="OTHER">📋 Sự cố / Yêu cầu khác</option>
+                    <option value="HARDWARE">Lỗi phần cứng / Thiết bị</option>
+                    <option value="SOFTWARE">Lỗi phần mềm / Hỗ trợ từ xa</option>
+                    <option value="OTHER">Sự cố / Yêu cầu khác</option>
                   </select>
                 </div>
                 <div>
@@ -1864,13 +1982,13 @@ export default function Maintenance() {
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Lưu Toàn Bộ Thông Tin
                 </button>
@@ -1902,14 +2020,14 @@ export default function Maintenance() {
                   onChange={e => setExportSortBy(e.target.value)}
                   className="w-full p-2.5 border border-slate-300 rounded-xl font-semibold bg-white outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="fundingSource">💰 Nguồn kinh phí (Ngân sách, Dịch vụ y tế, Thu sự nghiệp...)</option>
-                  <option value="status">📌 Tình trạng xử lý (Chờ tiếp nhận, Đang xử lý, Đã hoàn thành...)</option>
-                  <option value="managingUnit">🏢 Khối quản lý (CNTT, Khoa Dược, Phòng TCHC)</option>
-                  <option value="department">🏛️ Khoa / Phòng yêu cầu (A-Z)</option>
-                  <option value="priority">⚡ Mức độ ưu tiên (Khẩn cấp, Cao, Trung bình, Thấp)</option>
-                  <option value="date">📅 Ngày báo hỏng / sửa chữa</option>
-                  <option value="cost">💵 Chi phí sửa chữa</option>
-                  <option value="assetCode">🏷️ Mã thiết bị (Asset Code)</option>
+                  <option value="fundingSource">Nguồn kinh phí (Ngân sách, Dịch vụ y tế, Thu sự nghiệp...)</option>
+                  <option value="status">Tình trạng xử lý (Chờ tiếp nhận, Đang xử lý, Đã hoàn thành...)</option>
+                  <option value="managingUnit">Khối quản lý (CNTT, Khoa Dược, Phòng TCHC)</option>
+                  <option value="department">Khoa / Phòng yêu cầu (A-Z)</option>
+                  <option value="priority">Mức độ ưu tiên (Khẩn cấp, Cao, Trung bình, Thấp)</option>
+                  <option value="date">Ngày báo hỏng / sửa chữa</option>
+                  <option value="cost">Chi phí sửa chữa</option>
+                  <option value="assetCode">Mã thiết bị (Asset Code)</option>
                 </select>
               </div>
 
@@ -1919,44 +2037,44 @@ export default function Maintenance() {
                   <button
                     type="button"
                     onClick={() => setExportSortOrder('asc')}
-                    className={`p-2.5 rounded-xl border text-center font-bold cursor-pointer transition ${
+                    className={`p-2.5 rounded-md border text-center font-bold cursor-pointer transition ${
                       exportSortOrder === 'asc'
                         ? 'bg-blue-50 border-blue-500 text-blue-800'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Tăng dần (A ➔ Z / Cũ ➔ Mới)
+                    Tăng dần (A - Z / Cũ - Mới)
                   </button>
                   <button
                     type="button"
                     onClick={() => setExportSortOrder('desc')}
-                    className={`p-2.5 rounded-xl border text-center font-bold cursor-pointer transition ${
+                    className={`p-2.5 rounded-md border text-center font-bold cursor-pointer transition ${
                       exportSortOrder === 'desc'
                         ? 'bg-blue-50 border-blue-500 text-blue-800'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Giảm dần (Z ➔ A / Mới ➔ Cũ)
+                    Giảm dần (Z - A / Mới - Cũ)
                   </button>
                 </div>
               </div>
 
               <div className="p-3 bg-blue-50 rounded-xl text-blue-800 text-[11px]">
-                <p>💡 File Excel xuất ra sẽ được định dạng chuẩn CDC Đà Nẵng, có kẻ bảng, tổng hợp kinh phí bằng công thức SUM và sẵn 3 khối chữ ký.</p>
+                <p>File Excel xuất ra sẽ được định dạng chuẩn CDC Đà Nẵng, có kẻ bảng, tổng hợp kinh phí bằng công thức SUM và sẵn 3 khối chữ ký.</p>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowExportModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer"
                 >
                   Đóng
                 </button>
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold shadow flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-4 h-4" /> Tải File Excel
                 </button>
@@ -1998,14 +2116,14 @@ export default function Maintenance() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold shadow transition cursor-pointer"
                   title="In trực tiếp văn bản này ra máy in hoặc lưu PDF"
                 >
                   <Printer className="w-4 h-4" /> In Phiếu Này (A4)
                 </button>
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="p-1.5 hover:bg-white/20 rounded-xl transition text-white"
+                  className="p-1.5 hover:bg-white/20 rounded-md transition text-white"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -2013,35 +2131,35 @@ export default function Maintenance() {
             </div>
 
             {/* Template Selector Tabs */}
-            <div className="bg-slate-100 px-6 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
-              <div className="flex items-center gap-2">
+            <div className="bg-slate-100 px-3 sm:px-6 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setDetailPrintTab('PROPOSAL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     detailPrintTab === 'PROPOSAL' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  Mẫu 1: Phiếu Báo Hỏng & Đề Xuất Sửa Chữa
+                  Mẫu 1: Phiếu Báo Hỏng &amp; Đề Xuất Sửa Chữa
                 </button>
                 <button
                   onClick={() => setDetailPrintTab('ACCEPTANCE')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     detailPrintTab === 'ACCEPTANCE' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  Mẫu 2: Biên Bản Nghiệm Thu & Bàn Giao
+                  Mẫu 2: Biên Bản Nghiệm Thu &amp; Bàn Giao
                 </button>
               </div>
               <span className="text-[11px] text-slate-500 italic">Khổ giấy in tiêu chuẩn A4</span>
             </div>
 
             {/* Printable Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-slate-50">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-8 bg-slate-50">
               {/* TAB 1: PHIẾU BÁO HỎNG & ĐỀ XUẤT SỬA CHỮA */}
               {detailPrintTab === 'PROPOSAL' && (
-                <div className="bg-white p-8 sm:p-10 rounded-2xl shadow-md border border-slate-200 font-serif text-slate-900 print:shadow-none print:border-none print:p-0 max-w-3xl mx-auto">
+                <div className="bg-white p-4 sm:p-10 rounded-2xl shadow-md border border-slate-200 font-serif text-slate-900 print:shadow-none print:border-none print:p-0 max-w-3xl mx-auto">
                   <div className="flex justify-between items-start text-xs sm:text-sm font-sans mb-4 border-b border-slate-200 pb-4">
                     <div>
                       <div className="font-bold uppercase">TRUNG TÂM KIỂM SOÁT BỆNH TẬT TP ĐÀ NẴNG</div>

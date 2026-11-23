@@ -133,6 +133,7 @@ export default function Assets() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(
     Boolean((!isDeptUser && searchParams.get('departmentId')) || searchParams.get('categoryId') || searchParams.get('location'))
   );
+  const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
 
   // Selection & Quick Drawer
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -579,26 +580,28 @@ export default function Assets() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {user?.role !== 'VIEWER' && (
             <button
               type="button"
               onClick={() => navigate('/maintenance?quickReport=1')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition cursor-pointer"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-2 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition cursor-pointer"
               title="Mở nhanh phiếu báo hỏng thiết bị"
+              aria-label="Báo hỏng nhanh"
             >
-              <Wrench className="w-3.5 h-3.5 text-amber-600" />
-              <span>Báo hỏng nhanh</span>
+              <Wrench className="w-4 h-4 text-amber-600" />
+              <span className="hidden lg:inline">Báo hỏng</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={() => navigate('/qr-scanner')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer"
+            title="Quét mã QR thiết bị"
+            aria-label="Quét mã QR"
+            className="hidden sm:flex p-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer"
           >
-            <QrCode className="w-3.5 h-3.5 text-slate-500" />
-            <span>Quét QR</span>
+            <QrCode className="w-4 h-4 text-slate-600" />
           </button>
 
           <button
@@ -606,15 +609,16 @@ export default function Assets() {
             onClick={() => handleOpenQrStudio(selectedIds.length > 0 ? 'selected' : 'filtered')}
             disabled={printingBatch || total === 0}
             title="Xuất & In nhiều tem QR kiểm kê trên trang A4 theo bộ lọc hoặc dòng đang chọn"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 text-blue-800 text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+            aria-label="Xuất tem QR A4"
+            className="flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-2.5 py-1.5 sm:py-2 rounded-md border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 text-blue-800 text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
           >
-            <Printer className="w-3.5 h-3.5 text-blue-700" />
-            <span>
+            <Printer className="w-4 h-4 text-blue-700" />
+            <span className="hidden md:inline">
               {printingBatch
                 ? 'Đang mở...'
                 : selectedIds.length > 0
-                ? `Xuất tem QR (${selectedIds.length})`
-                : 'Xuất tem QR A4'}
+                ? `QR (${selectedIds.length})`
+                : 'Tem QR'}
             </span>
           </button>
 
@@ -622,28 +626,31 @@ export default function Assets() {
             type="button"
             onClick={handleExportExcel}
             disabled={exporting}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition disabled:opacity-50 cursor-pointer"
+            title="Xuất file Excel danh sách tài sản"
+            aria-label="Xuất Excel"
+            className="flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-2.5 py-1.5 sm:py-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition disabled:opacity-50 cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{exporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span className="hidden lg:inline">{exporting ? 'Đang xuất...' : 'Excel'}</span>
           </button>
 
           {canManage && (
             <button
               type="button"
               onClick={() => navigate('/assets/new')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-medium shadow-xs transition cursor-pointer"
+              title="Thêm tài sản mới"
+              className="flex items-center gap-1.5 min-h-[36px] sm:min-h-0 px-3 py-1.5 sm:py-2 rounded-md bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Thêm tài sản mới</span>
+              <span>Thêm TS</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Unified Top Bar: Division Segmented Tabs + Group-by View Switcher */}
-      <div className="bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1">
+      <div className="bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar sm:flex-wrap">
           {divisionTabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -666,13 +673,13 @@ export default function Assets() {
                   }
                   setPage(1);
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
                   active
                     ? 'bg-blue-700 text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5 shrink-0" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -680,8 +687,8 @@ export default function Assets() {
         </div>
 
         {/* Compact Group-by View Switcher */}
-        <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
-          <span className="text-[11px] font-semibold text-slate-500 pl-2 pr-1 hidden sm:inline-flex items-center gap-1">
+        <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl overflow-x-auto no-scrollbar w-full lg:w-auto">
+          <span className="text-[11px] font-semibold text-slate-500 pl-2 pr-1 hidden sm:inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
             <FolderKanban className="w-3.5 h-3.5 text-blue-600" />
             Góc nhìn:
           </span>
@@ -696,7 +703,7 @@ export default function Assets() {
                   setGroupBy(opt.value);
                   setExpandedGroups({});
                 }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap shrink-0 ${
                   active
                     ? 'bg-white text-blue-700 shadow-xs font-semibold'
                     : 'text-slate-600 hover:text-slate-900'
@@ -710,128 +717,146 @@ export default function Assets() {
       </div>
 
       {/* UI/UX Pro Max: 2-Tier Compact Omnibox Search & Facet Command Deck */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3 space-y-2.5 relative">
-        {/* Tier 1: Unified Single-Row Omnibox + Inline Selectors + Sort Popover Trigger */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-2.5 sm:p-3 space-y-2.5 relative">
+        {/* Tier 1: Unified Single-Row Omnibox + Mobile Filter Trigger + Desktop Selectors */}
         <div className="flex flex-col xl:flex-row gap-2">
-          {/* Omnibox Input with Floating Smart Palette */}
-          <div className="relative flex-1 min-w-[260px]">
-            <Search className="w-4 h-4 text-blue-600 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Tìm mã TS, tên, khoa, tầng, người SD... (Nhấn '/' để tìm hoặc mở ✨ Cú pháp)"
-              className="w-full pl-9 pr-24 py-2 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none transition"
-            />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {searchInput ? (
-                <button
-                  type="button"
-                  onClick={() => setSearchInput('')}
-                  aria-label="Xóa từ khóa tìm kiếm"
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white border border-slate-200 rounded">
-                  /
-                </kbd>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowSmartHints((prev) => !prev)}
-                title="Mở bảng gợi ý từ khóa & cú pháp thông minh"
-                className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer inline-flex items-center gap-1 ${
-                  showSmartHints
-                    ? 'bg-blue-700 text-white border-blue-700 shadow-2xs'
-                    : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
-                }`}
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Cú pháp</span>
-              </button>
-            </div>
-
-            {/* Floating Smart Search Assistant Popover */}
-            {showSmartHints && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-3.5 space-y-3 text-xs">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="font-heading font-semibold text-slate-900 inline-flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    Trợ lý Siêu Tìm Kiếm Đa Trường (14 cột dữ liệu)
-                  </span>
+          {/* Omnibox Input + Mobile Collapsible Filter Toggle */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-4 h-4 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Tìm mã TS, tên máy, khoa, người SD..."
+                className="w-full pl-9 pr-20 py-2 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-600 outline-none transition"
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchInput ? (
                   <button
                     type="button"
-                    onClick={() => setShowSmartHints(false)}
-                    className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                    onClick={() => setSearchInput('')}
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="text-[11px] font-semibold text-slate-500">
-                    1. Bấm chèn nhanh thẻ lọc thông minh (Smart Tags):
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SMART_TAG_EXAMPLES.map((item) => {
-                      const active = searchInput.toLowerCase().includes(item.tag.toLowerCase());
-                      return (
-                        <button
-                          key={item.tag}
-                          type="button"
-                          onClick={() => toggleSmartTag(item.tag)}
-                          className={`px-2.5 py-1 rounded-lg font-mono text-[11px] border transition cursor-pointer inline-flex items-center gap-1 ${
-                            active
-                              ? 'bg-blue-700 text-white border-blue-700 font-semibold'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'
-                          }`}
-                        >
-                          <span>{item.label}</span>
-                          <span className={`font-sans text-[10px] ${active ? 'text-blue-100' : 'text-slate-400'}`}>
-                            · {item.desc}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                  <div className="text-[11px] font-semibold text-slate-500">
-                    2. Cụm từ tìm kiếm chéo nhiều trường mẫu (1-Click):
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      'điều hòa tầng 3',
-                      'bàn xét nghiệm',
-                      'tủ hồ sơ khnv',
-                      'xe ô tô',
-                      'máy phát điện',
-                      'máy in pkđk',
-                    ].map((phrase) => (
-                      <button
-                        key={phrase}
-                        type="button"
-                        onClick={() => {
-                          setSearchInput(phrase);
-                          setShowSmartHints(false);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[11px] font-medium transition cursor-pointer"
-                      >
-                        "{phrase}"
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                ) : (
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white border border-slate-200 rounded">
+                    /
+                  </kbd>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowSmartHints((prev) => !prev)}
+                  title="Mở bảng gợi ý từ khóa & cú pháp thông minh"
+                  aria-label="Cú pháp tìm kiếm"
+                  className={`p-1.5 sm:px-2 sm:py-1 rounded-md text-[11px] font-semibold border transition cursor-pointer inline-flex items-center gap-1 ${
+                    showSmartHints
+                      ? 'bg-blue-700 text-white border-blue-700 shadow-2xs'
+                      : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+                  <span className="hidden sm:inline">Cú pháp</span>
+                </button>
               </div>
-            )}
+
+              {/* Floating Smart Search Assistant Popover */}
+              {showSmartHints && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-3.5 space-y-3 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-heading font-semibold text-slate-900 inline-flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      Trợ lý Siêu Tìm Kiếm Đa Trường (14 cột dữ liệu)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSmartHints(false)}
+                      className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      1. Bấm chèn nhanh thẻ lọc thông minh (Smart Tags):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SMART_TAG_EXAMPLES.map((item) => {
+                        const active = searchInput.toLowerCase().includes(item.tag.toLowerCase());
+                        return (
+                          <button
+                            key={item.tag}
+                            type="button"
+                            onClick={() => toggleSmartTag(item.tag)}
+                            className={`px-2.5 py-1 rounded-md font-mono text-[11px] border transition cursor-pointer inline-flex items-center gap-1 ${
+                              active
+                                ? 'bg-blue-700 text-white border-blue-700 font-semibold'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'
+                            }`}
+                          >
+                            <span>{item.label}</span>
+                            <span className={`font-sans text-[10px] ${active ? 'text-blue-100' : 'text-slate-400'}`}>
+                              · {item.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      2. Cụm từ tìm kiếm chéo nhiều trường mẫu (1-Click):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'điều hòa tầng 3',
+                        'bàn xét nghiệm',
+                        'tủ hồ sơ khnv',
+                        'xe ô tô',
+                        'máy phát điện',
+                        'máy in pkđk',
+                      ].map((phrase) => (
+                        <button
+                          key={phrase}
+                          type="button"
+                          onClick={() => {
+                            setSearchInput(phrase);
+                            setShowSmartHints(false);
+                          }}
+                          className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[11px] font-medium transition cursor-pointer"
+                        >
+                          "{phrase}"
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((v) => !v)}
+              title="Mở bộ lọc"
+              aria-label="Mở bộ lọc"
+              className={`md:hidden shrink-0 inline-flex items-center justify-center gap-1 min-h-[38px] px-2.5 py-1.5 rounded-md border text-xs font-semibold transition cursor-pointer ${
+                showMobileFilters || hasAnyFilter
+                  ? 'border-blue-300 bg-blue-50 text-blue-800'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              {hasAnyFilter && <span className="w-1.5 h-1.5 rounded-full bg-blue-700" />}
+            </button>
           </div>
 
           {/* Inline High-Frequency Filter & Sort Controls */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className={`${showMobileFilters ? 'flex' : 'hidden'} md:flex flex-wrap items-center gap-1.5`}>
             {!isDeptUser && (
               <select
                 value={selectedDept}
@@ -938,7 +963,7 @@ export default function Assets() {
               type="button"
               onClick={() => setShowAdvancedFilters((prev) => !prev)}
               title="Sắp xếp Lớp 2, Cơ sở, Danh mục & Số dòng/trang"
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs font-medium transition cursor-pointer ${
                 showAdvancedFilters || sortBy2 || selectedLocation || selectedCategory
                   ? 'border-blue-300 bg-blue-50/70 text-blue-700 font-semibold'
                   : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
@@ -954,14 +979,14 @@ export default function Assets() {
         </div>
 
         {/* Tier 2: Single-Line Tabbed Quick Facet Strip (Floor | Function | Status) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        <div className={`${showMobileFilters ? 'flex' : 'hidden'} md:flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100`}>
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar sm:flex-wrap w-full sm:w-auto pb-0.5 sm:pb-0 min-w-0">
             {/* Mini Dimension Switcher */}
             <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200/70 mr-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setQuickFacetMode('floor')}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
                   quickFacetMode === 'floor'
                     ? 'bg-white text-blue-700 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-800'
@@ -973,7 +998,7 @@ export default function Assets() {
                 <button
                   type="button"
                   onClick={() => setQuickFacetMode('function')}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
                     quickFacetMode === 'function'
                       ? 'bg-white text-blue-700 shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800'
@@ -985,7 +1010,7 @@ export default function Assets() {
               <button
                 type="button"
                 onClick={() => setQuickFacetMode('status')}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
                   quickFacetMode === 'status'
                     ? 'bg-white text-blue-700 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-800'
@@ -1010,7 +1035,7 @@ export default function Assets() {
                       setSelectedFloor(active && fl.value !== 'Tất cả tầng' ? 'Tất cả tầng' : fl.value);
                       setPage(1);
                     }}
-                    className={`px-2 py-0.5 rounded-lg text-xs font-medium border transition cursor-pointer inline-flex items-center gap-1 ${
+                    className={`px-2 py-0.5 rounded-md text-xs font-medium border transition cursor-pointer inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
                       active
                         ? 'bg-blue-700 text-white border-blue-700 font-semibold'
                         : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
@@ -1038,7 +1063,7 @@ export default function Assets() {
                       setSelectedAssetGroup(active ? '' : grp.value);
                       setPage(1);
                     }}
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition cursor-pointer inline-flex items-center gap-1 ${
+                    className={`px-2.5 py-0.5 rounded-md text-xs font-medium border transition cursor-pointer inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
                       active
                         ? 'bg-blue-700 text-white border-blue-700 font-semibold'
                         : `${grp.badgeClass} opacity-90 hover:opacity-100`
@@ -1066,7 +1091,7 @@ export default function Assets() {
                       setSelectedStatus(active && chip.value ? '' : chip.value);
                       setPage(1);
                     }}
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition cursor-pointer inline-flex items-center gap-1 ${
+                    className={`px-2.5 py-0.5 rounded-md text-xs font-medium border transition cursor-pointer inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
                       active
                         ? 'bg-slate-900 text-white border-slate-900'
                         : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
@@ -1255,7 +1280,7 @@ export default function Assets() {
               type="button"
               onClick={() => handleOpenQrStudio('selected')}
               disabled={printingBatch}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition cursor-pointer disabled:opacity-50"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>{printingBatch ? 'Đang tạo nhãn...' : 'Xuất tem QR A4'}</span>
@@ -1263,7 +1288,7 @@ export default function Assets() {
             <button
               type="button"
               onClick={handleExportExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium transition cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Xuất Excel lọc</span>
@@ -1271,7 +1296,7 @@ export default function Assets() {
             <button
               type="button"
               onClick={() => setSelectedIds([])}
-              className="px-2.5 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              className="px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
             >
               Bỏ chọn
             </button>
@@ -1315,7 +1340,7 @@ export default function Assets() {
                   });
                   setExpandedGroups(next);
                 }}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium cursor-pointer"
+                className="px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium cursor-pointer"
               >
                 Mở rộng tất cả
               </button>
@@ -1328,7 +1353,7 @@ export default function Assets() {
                   });
                   setExpandedGroups(next);
                 }}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium cursor-pointer"
+                className="px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium cursor-pointer"
               >
                 Thu gọn tất cả
               </button>
@@ -1398,7 +1423,7 @@ export default function Assets() {
                         e.stopPropagation();
                         handleDrillIntoGroup(groupBy, bucket.key);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-semibold transition cursor-pointer"
+                      className="px-2.5 py-1 rounded-md bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-semibold transition cursor-pointer"
                     >
                       Lọc riêng nhóm này →
                     </button>
@@ -1491,7 +1516,7 @@ export default function Assets() {
                                 <button
                                   type="button"
                                   onClick={() => setQuickViewAssetId(item.id)}
-                                  className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-blue-50 text-blue-700 text-[11px] font-medium cursor-pointer"
+                                  className="px-2 py-1 rounded-md border border-slate-200 hover:bg-blue-50 text-blue-700 text-[11px] font-medium cursor-pointer"
                                 >
                                   Mở
                                 </button>
@@ -1905,7 +1930,7 @@ export default function Assets() {
                     <button
                       type="button"
                       onClick={() => navigate(`/maintenance?assetId=${asset.id}`)}
-                      className="h-10 px-2.5 rounded-xl border border-amber-200 bg-amber-50 text-xs font-semibold text-amber-800 hover:bg-amber-100 inline-flex items-center gap-1"
+                      className="h-10 px-2.5 rounded-md border border-amber-200 bg-amber-50 text-xs font-semibold text-amber-800 hover:bg-amber-100 inline-flex items-center gap-1"
                     >
                       <Wrench className="w-3.5 h-3.5" />
                       <span>Báo hỏng</span>
@@ -1914,7 +1939,7 @@ export default function Assets() {
                   <button
                     type="button"
                     onClick={() => setQuickViewAssetId(asset.id)}
-                    className="h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
+                    className="h-10 px-3 rounded-md border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
                   >
                     <PanelRightOpen className="w-3.5 h-3.5" />
                     <span>Xem nhanh</span>
@@ -1922,7 +1947,7 @@ export default function Assets() {
                   <button
                     type="button"
                     onClick={() => navigate(`/assets/${asset.id}`)}
-                    className="h-10 px-3 rounded-xl bg-blue-700 text-white text-xs font-medium inline-flex items-center gap-1"
+                    className="h-10 px-3 rounded-md bg-blue-700 text-white text-xs font-medium inline-flex items-center gap-1"
                   >
                     <span>Chi tiết</span>
                   </button>
@@ -1950,7 +1975,7 @@ export default function Assets() {
             type="button"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1 min-h-[38px] sm:min-h-0 px-3 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
           >
             <ChevronLeft className="w-4 h-4" />
             <span>Trước</span>
@@ -1960,7 +1985,7 @@ export default function Assets() {
             type="button"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1 min-h-[38px] sm:min-h-0 px-3 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
           >
             <span>Sau</span>
             <ChevronRight className="w-4 h-4" />

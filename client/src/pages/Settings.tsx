@@ -309,7 +309,7 @@ export default function Settings() {
                   type="button"
                   onClick={handleDetectChats}
                   disabled={detecting || (!botTokenInput.trim() && !hasToken)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-semibold transition disabled:opacity-50 cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-semibold transition disabled:opacity-50 cursor-pointer shrink-0"
                 >
                   {detecting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                   <span>Tự dò Group ID</span>
@@ -393,7 +393,7 @@ export default function Settings() {
                   type="button"
                   onClick={() => handleTestSend('default', defaultChatId)}
                   disabled={testingChat === 'default' || !defaultChatId.trim()}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-45 cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-45 cursor-pointer shrink-0"
                 >
                   <Send className="w-3.5 h-3.5 text-emerald-600" />
                   <span>{testingChat === 'default' ? 'Đang gửi...' : 'Gửi tin thử'}</span>
@@ -456,7 +456,7 @@ export default function Settings() {
                             type="button"
                             onClick={() => handleTestSend(unit.key, unit.value, unit.label)}
                             disabled={testingChat === unit.key}
-                            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 cursor-pointer shrink-0"
+                            className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 cursor-pointer shrink-0"
                           >
                             {testingChat === unit.key ? '...' : 'Thử'}
                           </button>
@@ -499,7 +499,7 @@ export default function Settings() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#024383] hover:bg-[#02366b] text-white text-xs sm:text-sm font-semibold shadow-xs transition disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-[#024383] hover:bg-[#02366b] text-white text-xs sm:text-sm font-semibold shadow-xs transition disabled:opacity-50 cursor-pointer"
               >
                 <Save className="w-4 h-4" />
                 <span>{saving ? 'Đang lưu...' : 'Lưu cài đặt Telegram'}</span>
